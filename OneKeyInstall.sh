@@ -44,7 +44,8 @@ die()  { printf '\033[1;31m[PLS]\033[0m %s\n' "$*" >&2; exit 1; }
 pick_fastest() {
   local best="" bestsp=0 u sp
   for u in "$@"; do
-    sp=$(curl -sL --connect-timeout 5 -m 10 -o /dev/null -r 0-1048575 -w '%{speed_download}' "$u" 2>/dev/null || echo 0)
+    # 限时测速(8秒样本), 不用 -r Range 头: Termux/部分环境 curl 对字节范围报 bad range
+    sp=$(curl -sL --connect-timeout 5 -m 8 -o /dev/null -w '%{speed_download}' "$u" 2>/dev/null || echo 0)
     sp=${sp%.*}
     log "  测速 ${sp:-0}B/s  $u"
     if [ "${sp:-0}" -gt "$bestsp" ] 2>/dev/null; then bestsp=$sp; best=$u; fi
