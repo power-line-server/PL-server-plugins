@@ -103,13 +103,13 @@ suspend fun handleInput(reader: LineReader) {
         } catch (_: EndOfFileException) {
             // 输入流 EOF(screen/nohup/面板执行等 stdin 为 /dev/null 或已关闭): 忽略并继续, 不退出服务器.
             // 否则这些环境下服务器启动即秒退. 需要停服请用 exit 命令(或 Ctrl-C 两次强制退出).
+            // 仅提示一次, 避免无输入流环境(screen/nohup)下每秒刷屏
             if (last == 0) {
-                reader.printAbove("Catch EndOfFile, 已忽略(无输入流)。需要停服请用 exit")
+                reader.printAbove("Catch EndOfFile: 无输入流, 已忽略(仅提示一次)。停服用 exit")
                 last = 1
             }
             // 避免 EOF 忙转: stdin 无输入时 readLine 会立即返回, 稍等再继续
             Thread.sleep(1000)
-            last = 0
             continue
         }
         last = 0

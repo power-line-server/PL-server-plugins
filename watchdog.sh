@@ -45,8 +45,10 @@ while true; do
     # 删除旧心跳文件, 避免本次启动早期被误判为卡死
     rm -f "$HEART"
     # 终端运行=控制台交互; 非终端(面板/nohup/重定向)时用管道保活, 否则 EOF 秒退
-    if [ -t 0 ]; then
-        java $JAVA_OPTS &
+    # 交互分支: 后台作业的 stdin 会被 bash 强制改为 /dev/null, 必须显式指向控制终端(/dev/tty),
+    # 否则即使在前台终端跑也读不到输入且持续 EOF. 无控制终端时用管道保活.
+    if [ -t 0 ] && [ -r /dev/tty ] 2>/dev/null; then
+        java $JAVA_OPTS < /dev/tty &
     else
         tail -f /dev/null | java $JAVA_OPTS &
     fi
