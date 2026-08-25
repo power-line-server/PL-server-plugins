@@ -101,19 +101,16 @@ suspend fun handleInput(reader: LineReader) {
             reader.printAbove("force exit")
             exitProcess(255)
         } catch (_: EndOfFileException) {
-            if (last != 2) {
-                reader.printAbove("Catch EndOfFile, again to exit application")
-                last = 2
-                continue
+            // 输入流 EOF(screen/nohup/面板执行等 stdin 为 /dev/null 或已关闭): 忽略并继续, 不退出服务器.
+            // 否则这些环境下服务器启动即秒退. 需要停服请用 exit 命令(或 Ctrl-C 两次强制退出).
+            if (last == 0) {
+                reader.printAbove("Catch EndOfFile, 已忽略(无输入流)。需要停服请用 exit")
+                last = 1
             }
-            reader.printAbove("exit")
-            // NonCancellable: disableAll() 会取消 console 脚本的协程作用域, 导致本协程被取消
-            // 必须用 NonCancellable 防止取消, 确保 exitProcess 能执行
-            withContext(Dispatchers.IO + NonCancellable) {
-                // disableAll 在启动早期(如 boot 事务进行中)可能报 Nest Transaction 嵌套错误, 容错保证退出
-                runCatching { ScriptManager.disableAll() }.onFailure { it.printStackTrace() }
-                exitProcess(1)
-            }
+            // 避免 EOF 忙转: stdin 无输入时 readLine 会立即返回, 稍等再继续
+            Thread.sleep(1000)
+            last = 0
+            continue
         }
         last = 0
         if (line.isEmpty()) continue

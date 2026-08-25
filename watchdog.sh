@@ -10,6 +10,8 @@ set -u
 cd "$(dirname "$0")" || exit 1
 FLAG="config/scripts/data/restart.flag"
 HEART="config/scripts/data/heartbeat.txt"
+# 输出日志文件(外部重定向时存在; 前台终端运行无此文件则跳过 Load Failed 检测)
+OUTLOG="${WATCHDOG_LOG:-watchdog.log}"
 # JVM options mirror run.bat; remove --enable-final-field-mutation on JDK < 24
 JAVA_OPTS="-Djava.net.preferIPv4Stack=true --enable-native-access=ALL-UNNAMED --enable-final-field-mutation=ALL-UNNAMED -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=dumps/ -Xlog:gc*:file=dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m -jar server.jar"
 
@@ -30,12 +32,24 @@ is_heartbeat_stale() {
     [ "$age" -gt 45 ]
 }
 
+# 检测本次启动是否出现脚本加载失败(SA 在 Linux 的类加载竞态, 偶发批量 Load Failed)
+# 有日志文件才检测; 前台终端运行(无文件)时跳过
+check_load_failed() {
+    [ -f "$OUTLOG" ] || return 1
+    tail -n 300 "$OUTLOG" 2>/dev/null | grep -aq "Load Failed"
+}
+
+FAILCNT=0
 while true; do
     echo "[watchdog] starting server..."
     # 删除旧心跳文件, 避免本次启动早期被误判为卡死
     rm -f "$HEART"
-    # tail 管道保持 stdin 打开: console 的 EOF 分支会在 stdin 关闭时退出服务器
-    tail -f /dev/null | java $JAVA_OPTS &
+    # 终端运行=控制台交互; 非终端(面板/nohup/重定向)时用管道保活, 否则 EOF 秒退
+    if [ -t 0 ]; then
+        java $JAVA_OPTS &
+    else
+        tail -f /dev/null | java $JAVA_OPTS &
+    fi
     PID=$!
 
     RESTART=0
@@ -52,19 +66,32 @@ while true; do
             RESTART=1
             break
         fi
+        if check_load_failed; then
+            echo "[watchdog] Load Failed(SA 类加载竞态), 自动重启..."
+            pkill -9 -f "java .*server.jar"
+            wait "$PID" 2>/dev/null
+            RESTART=2
+            break
+        fi
     done
 
     if [ "$RESTART" = 0 ]; then
         wait "$PID" 2>/dev/null
         if [ -f "$FLAG" ]; then
             rm -f "$FLAG"
+            FAILCNT=0
             echo "[watchdog] restart intent detected, relaunching..."
         else
             echo "[watchdog] server stopped normally, watchdog exits"
             break
         fi
     else
-        echo "[watchdog] hung server killed, relaunching..."
+        FAILCNT=$((FAILCNT + 1))
+        echo "[watchdog] hung server killed, relaunching... (失败 $FAILCNT/3)"
+    fi
+    if [ "$FAILCNT" -ge 3 ]; then
+        echo "[watchdog] 连续 3 次启动失败, 退出并请人工处理"
+        break
     fi
     PID=""
     sleep 3
