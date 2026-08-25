@@ -1,0 +1,66 @@
+package coreLibrary
+
+import cf.wayzer.placehold.DynamicVar
+import cf.wayzer.placehold.VarString
+import com.typesafe.config.Config
+import io.github.config4k.ClassContainer
+import io.github.config4k.CustomType
+import io.github.config4k.registerCustomType
+import io.github.config4k.toConfig
+import java.lang.management.ManagementFactory
+import java.time.Duration
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import kotlin.time.toKotlinDuration
+
+name = "基础变量注册"
+
+registerVar("\\n", "换行符", "\n")
+registerVar("joinLines", "'join \\n'的别名", DynamicVar {
+    VarToken("join", VarString.Parameters(it.params + "\n"))
+})
+registerVarForType<Duration>().apply {
+    registerToString("参数设定单位(天,时,分,秒,d,h,m,s,默认m)") { obj ->
+        DynamicVar { params ->
+            val arg = params.getOrNull<VarString.VarToken>(0)?.name
+                ?: return@DynamicVar obj.toKotlinDuration().toString()
+            val unit = when (arg[0].lowercaseChar()) {
+                'd', '天' -> ChronoUnit.DAYS
+                'h', '小', '时' -> ChronoUnit.HOURS
+                'm', '分' -> ChronoUnit.MINUTES
+                's', '秒' -> ChronoUnit.SECONDS
+                else -> ChronoUnit.MINUTES
+            }
+            // 只输出纯数字, 单位词由语言包文本提供(本地化); 参数仅用于选择时间单位
+            "%.2f".format(obj.seconds.toDouble() / unit.duration.seconds)
+        }
+    }
+}
+
+val startTime = Instant.ofEpochMilli(
+    runCatching { ManagementFactory.getRuntimeMXBean().startTime }.getOrElse { System.currentTimeMillis() }
+)!!
+registerVar("state.uptime", "进程运行时间", DynamicVar { Duration.between(startTime, Instant.now()) })
+
+@Suppress("PropertyName")
+val NANO_PRE_SECOND = 1000_000_000L
+fun Duration.toConfigString(): String {
+    //Select the smallest unit output
+    return when {
+        (nano % 1000) != 0 -> (seconds * NANO_PRE_SECOND + nano).toString() + "ns"
+        (nano % 1000_000) != 0 -> ((seconds * NANO_PRE_SECOND + nano) / 1000).toString() + "us"
+        nano != 0 -> ((seconds * NANO_PRE_SECOND + nano) / 1000_000).toString() + "ms"
+        (seconds % 60) != 0L -> seconds.toString() + "s"
+        (seconds % (60 * 60)) != 0L -> (seconds / 60).toString() + "m"
+        (seconds % (60 * 60 * 24)) != 0L -> (seconds / (60 * 60)).toString() + "h"
+        else -> (seconds / (60 * 60 * 24)).toString() + "d"
+    }
+}
+registerCustomType(object : CustomType {
+    override fun testParse(clazz: ClassContainer) = false
+    override fun parse(clazz: ClassContainer, config: Config, name: String) = UnsupportedOperationException()
+    override fun testToConfig(obj: Any) = obj is Duration
+    override fun toConfig(obj: Any, name: String): Config {
+        return (obj as Duration).toConfigString().toConfig(name)
+    }
+})

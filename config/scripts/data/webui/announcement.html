@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.announcement.title">公告管理 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; backdrop-filter: var(--glass-blur); }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { transition: transform 0.2s ease, background 0.2s ease; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); transform: translateX(4px); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; transform: translateX(4px); }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; animation: fadeInUp 0.3s ease-out; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .webui-card { background: var(--card-bg); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); backdrop-filter: var(--glass-blur); transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+    .webui-card:hover { transform: translateY(-2px); }
+    .has-gradient-bg { background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important; position: relative; }
+    .has-gradient-bg::before { content: ''; position: fixed; top: -10%; left: -10%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%); filter: blur(80px); z-index: -1; pointer-events: none; }
+    .has-gradient-bg::after { content: ''; position: fixed; bottom: -10%; right: -10%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%); filter: blur(90px); z-index: -1; pointer-events: none; }
+    html.dark .has-gradient-bg { background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important; }
+    html.dark .has-gradient-bg::before { background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%); }
+    html.dark .has-gradient-bg::after { background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%); }
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+    .btn-link { color: var(--text-muted); text-decoration: none; }
+    .btn-link:hover { color: var(--text); }
+
+    /* 公告管理页面样式 */
+    .announcement-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+    @media (max-width: 991.98px) {
+      .announcement-layout { grid-template-columns: 1fr; }
+    }
+    .ann-item {
+      border: 1px solid var(--border);
+      border-radius: var(--webui-card-radius);
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.75rem;
+      background: var(--input-bg);
+      transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .ann-item:last-child { margin-bottom: 0; }
+    .ann-item:hover { border-color: var(--webui-primary); transform: translateX(2px); }
+    .ann-item-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.3rem;
+    }
+    .ann-title {
+      font-weight: 600;
+      font-size: 1rem;
+      flex: 1;
+      color: var(--text);
+      word-break: break-word;
+    }
+    .ann-pinned-badge {
+      background: var(--webui-primary);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 0.1rem 0.45rem;
+      border-radius: 0.25rem;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .ann-time {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .ann-preview {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.55rem;
+      line-height: 1.45;
+      max-height: 4.4em;
+      overflow: hidden;
+      word-break: break-word;
+    }
+    .ann-actions {
+      display: flex;
+      gap: 0.4rem;
+    }
+    .ann-empty {
+      text-align: center;
+      color: var(--text-muted);
+      padding: 2rem 1rem;
+      font-size: 0.9rem;
+    }
+    #annContent {
+      min-height: 300px;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.5;
+    }
+    .ann-list-scroll {
+      max-height: 70vh;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+    .ann-list-scroll::-webkit-scrollbar { width: 6px; }
+    .ann-list-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .ann-list-scroll::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <div class="announcement-layout">
+        <!-- 公告列表 -->
+        <div>
+          <div class="webui-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h4 class="mb-0" data-i18n="webui.announcement.list">公告列表</h4>
+              <button class="btn btn-sm btn-primary" id="newBtn" data-i18n="webui.announcement.new">新增公告</button>
+            </div>
+            <div class="ann-list-scroll" id="annList">
+              <div class="ann-empty" data-i18n="webui.announcement.loading">加载中...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 编辑表单 -->
+        <div>
+          <div class="webui-card p-4">
+            <h4 class="mb-3" id="formTitle" data-i18n="webui.announcement.new">新增公告</h4>
+            <div class="mb-3">
+              <label class="form-label" for="annTitle" data-i18n="webui.announcement.titleLabel">标题</label>
+              <input type="text" class="form-control" id="annTitle" placeholder="请输入公告标题" data-i18n-placeholder="webui.announcement.titlePlaceholder">
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="annContent" data-i18n="webui.announcement.contentLabel">内容</label>
+              <textarea class="form-control" id="annContent" rows="12" placeholder="请输入公告内容，支持 Mindustry 颜色码" data-i18n-placeholder="webui.announcement.contentPlaceholder"></textarea>
+            </div>
+            <div class="mb-3">
+              <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="annPinned">
+                <label class="form-check-label" for="annPinned" data-i18n="webui.announcement.pinned">置顶</label>
+              </div>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <button class="btn btn-primary" id="saveBtn" data-i18n="webui.announcement.save">保存</button>
+              <button class="btn btn-outline-secondary" id="resetBtn" data-i18n="webui.announcement.reset">清空</button>
+              <button class="btn btn-success" id="notifyBtn" data-i18n="webui.announcement.notify">通知在线玩家</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var editingId = 0;
+      var lastList = [];
+
+      function t(key, def) {
+        return WebUI.t(key, def);
+      }
+
+      function loadAnnouncements() {
+        var listEl = document.getElementById('annList');
+        listEl.innerHTML = '<div class="ann-empty">' + t('webui.announcement.loading', '加载中...') + '</div>';
+        WebUI.apiGet('/api/announcements').then(function (res) {
+          lastList = (res && res.announcements) ? res.announcements : [];
+          renderList(lastList);
+        }).catch(function (e) {
+          listEl.innerHTML = '<div class="ann-empty">' + WebUI.escapeHtml(e.message || WebUI.t('webui.common.loadFailed', '加载失败')) + '</div>';
+          WebUI.toast(e.message || t('webui.announcement.loadFailed', '加载失败'), 'error');
+        });
+      }
+
+      function renderList(list) {
+        var listEl = document.getElementById('annList');
+        if (!list || !list.length) {
+          listEl.innerHTML = '<div class="ann-empty">' + t('webui.announcement.empty', '暂无公告') + '</div>';
+          return;
+        }
+        // 排序：置顶优先，然后按时间倒序
+        list.sort(function (a, b) {
+          if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+          return (b.timestamp || 0) - (a.timestamp || 0);
+        });
+        listEl.innerHTML = list.map(function (item) {
+          var title = WebUI.escapeHtml(item.title || '');
+          var time = WebUI.escapeHtml(WebUI.formatTime(item.timestamp || 0));
+          var rawContent = item.content || '';
+          var previewText = rawContent.substring(0, 50);
+          if (rawContent.length > 50) previewText += '...';
+          var preview = WebUI.parseMindustryColors(previewText);
+          var pinnedBadge = item.pinned ? '<span class="ann-pinned-badge" data-i18n="webui.announcement.pinnedBadge">置顶</span>' : '';
+          return '<div class="ann-item" data-id="' + item.id + '">' +
+            '<div class="ann-item-header">' +
+              '<span class="ann-title">' + title + '</span>' +
+              pinnedBadge +
+            '</div>' +
+            '<div class="ann-time">' + time + '</div>' +
+            '<div class="ann-preview">' + preview + '</div>' +
+            '<div class="ann-actions">' +
+              '<button class="btn btn-sm btn-outline-primary edit-btn">' + t('webui.announcement.edit', '编辑') + '</button>' +
+              '<button class="btn btn-sm btn-outline-danger delete-btn">' + t('webui.announcement.delete', '删除') + '</button>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+
+        var items = listEl.querySelectorAll('.ann-item');
+        for (var i = 0; i < items.length; i++) {
+          (function (el) {
+            var id = parseInt(el.getAttribute('data-id'), 10);
+            el.querySelector('.edit-btn').addEventListener('click', function () { editById(id); });
+            el.querySelector('.delete-btn').addEventListener('click', function () { deleteById(id); });
+          })(items[i]);
+        }
+      }
+
+      function editById(id) {
+        var item = null;
+        for (var i = 0; i < lastList.length; i++) {
+          if (lastList[i].id === id) { item = lastList[i]; break; }
+        }
+        if (!item) return;
+        editingId = item.id;
+        document.getElementById('formTitle').textContent = t('webui.announcement.editTitle', '编辑公告');
+        document.getElementById('annTitle').value = item.title || '';
+        document.getElementById('annContent').value = item.content || '';
+        document.getElementById('annPinned').checked = !!item.pinned;
+        document.getElementById('annTitle').focus();
+      }
+
+      function deleteById(id) {
+        if (!confirm(t('webui.announcement.confirmDelete', '确认删除此公告？'))) return;
+        WebUI.apiPost('/api/announcements/delete', { id: id }).then(function () {
+          WebUI.toast(t('webui.announcement.deleteSuccess', '删除成功'), 'success');
+          if (editingId === id) resetForm();
+          loadAnnouncements();
+        }).catch(function (e) {
+          WebUI.toast(e.message || t('webui.announcement.deleteFailed', '删除失败'), 'error');
+        });
+      }
+
+      function resetForm() {
+        editingId = 0;
+        document.getElementById('formTitle').textContent = t('webui.announcement.new', '新增公告');
+        document.getElementById('annTitle').value = '';
+        document.getElementById('annContent').value = '';
+        document.getElementById('annPinned').checked = false;
+      }
+
+      function saveAnnouncement() {
+        var title = document.getElementById('annTitle').value.trim();
+        var content = document.getElementById('annContent').value;
+        var pinned = document.getElementById('annPinned').checked;
+        if (!title) {
+          WebUI.toast(t('webui.announcement.titleRequired', '请输入标题'), 'error');
+          return;
+        }
+        WebUI.apiPost('/api/announcements', { id: editingId, title: title, content: content, pinned: pinned }).then(function () {
+          WebUI.toast(t('webui.announcement.saveSuccess', '保存成功'), 'success');
+          resetForm();
+          loadAnnouncements();
+        }).catch(function (e) {
+          WebUI.toast(e.message || t('webui.announcement.saveFailed', '保存失败'), 'error');
+        });
+      }
+
+      function notifyPlayers() {
+        WebUI.apiPost('/api/announcements/notify', {}).then(function () {
+          WebUI.toast(t('webui.announcement.notifySuccess', '已通知在线玩家'), 'success');
+        }).catch(function (e) {
+          WebUI.toast(e.message || t('webui.announcement.notifyFailed', '通知失败'), 'error');
+        });
+      }
+
+      WebUI.initPage('announcement', 'webui.announcement.title', '公告管理').then(function () {
+        loadAnnouncements();
+
+        document.getElementById('newBtn').addEventListener('click', resetForm);
+        document.getElementById('saveBtn').addEventListener('click', saveAnnouncement);
+        document.getElementById('resetBtn').addEventListener('click', resetForm);
+        document.getElementById('notifyBtn').addEventListener('click', notifyPlayers);
+      });
+    })();
+  </script>
+</body>
+</html>

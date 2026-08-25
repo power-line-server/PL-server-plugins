@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.console.title">控制台 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      --log-bg: #1e2128;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+      --log-bg: #14151e;
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 1.1rem; line-height: 1; }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1rem; flex: 1; display: flex; flex-direction: column; gap: 1rem; }
+    .webui-card { background: var(--card-bg); backdrop-filter: var(--glass-blur); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); }
+
+    .console-pane {
+      height: calc(100vh - 140px);
+      min-height: 400px;
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .pane-header {
+      display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;
+      padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); background: var(--card-bg);
+      border-top-left-radius: var(--webui-card-radius); border-top-right-radius: var(--webui-card-radius);
+    }
+    .pane-title { font-weight: 600; font-size: 0.95rem; margin-right: auto; color: var(--text); }
+    .log-toolbar { display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap; }
+    .level-btn { padding: 0.15rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; }
+    .level-btn.active { font-weight: 600; }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .conn-dot.live { background: #198754; } .conn-dot.off { background: #adb5bd; }
+    .log-stream {
+      flex: 1; overflow-y: auto; background: var(--log-bg); color: #d4d7dd;
+      font-family: 'Cascadia Code', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85rem; line-height: 1.5; padding: 0.5rem 1rem;
+    }
+    .log-line { white-space: pre-wrap; word-break: break-word; padding: 1px 0; }
+    .log-time { color: #6c757d; margin-right: 0.4rem; }
+    .log-level { font-weight: 600; margin-right: 0.4rem; }
+    .lvl-INFO .log-level, .lvl-INFO { color: #6ea8fe; }
+    .lvl-WARN .log-level, .lvl-WARN { color: #ffc107; }
+    .lvl-ERROR .log-level, .lvl-ERROR { color: #ff6b6b; }
+    .lvl-DEBUG .log-level, .lvl-DEBUG { color: #adb5bd; }
+
+    .cmd-input-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 1rem; border-top: 1px solid var(--border); background: var(--card-bg);
+    }
+    .cmd-prompt {
+      color: var(--webui-primary); font-weight: bold;
+      font-family: monospace; font-size: 1rem;
+    }
+    .cmd-input {
+      flex: 1; background: transparent; border: none; outline: none; color: var(--text);
+      font-family: 'Cascadia Code', 'Fira Code', SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.85rem;
+    }
+    .cmd-input::placeholder { color: var(--text-muted); }
+    .log-line.cmd-input-line {
+      background: rgba(13, 110, 253, 0.1);
+      border-left: 3px solid var(--webui-primary);
+      padding-left: 0.5rem; color: #d4d7dd; font-weight: 500;
+    }
+    .cmd-prompt-inline { color: #6ea8fe; font-weight: 600; }
+    @font-face {
+      font-family: 'MindustryIcon';
+      src: url('assets/icon.ttf') format('truetype');
+    }
+    .game-icon-ui {
+      font-family: 'MindustryIcon', sans-serif;
+      font-size: 0.9em;
+      display: inline-block;
+    }
+    .game-icon {
+      display: inline-block; min-width: 1em; text-align: center;
+      color: var(--text-muted); font-size: 0.7em;
+      opacity: 0.5; cursor: help;
+    }
+    .content-icon {
+      width: 1em; height: 1em; vertical-align: -0.15em;
+      display: inline-block; image-rendering: pixelated;
+    }
+    .form-control:focus { border-color: var(--webui-primary); box-shadow: 0 0 0 0.2rem rgba(13,110,253,0.15); }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+  </style>
+</head>
+<body>
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <!-- 控制台（日志流 + 命令输入） -->
+      <section class="webui-card console-pane">
+        <div class="pane-header">
+          <span class="pane-title" data-i18n="webui.console.logStream">实时日志</span>
+          <span class="conn-dot off" id="connDot" title="连接状态" data-i18n-title="webui.console.connStatus"></span>
+          <span class="text-muted small" id="connStatus" data-i18n="webui.console.disconnected">未连接</span>
+          <div class="log-toolbar">
+            <input type="text" class="form-control form-control-sm" id="logSearch"
+                   placeholder="搜索日志..." style="width:140px;"
+                   data-i18n-placeholder="webui.console.searchPlaceholder">
+            <button class="btn btn-sm btn-outline-secondary level-btn active" data-level="ALL" data-i18n="webui.console.levelAll">全部</button>
+            <button class="btn btn-sm btn-outline-info level-btn" data-level="INFO">INFO</button>
+            <button class="btn btn-sm btn-outline-warning level-btn" data-level="WARN">WARN</button>
+            <button class="btn btn-sm btn-outline-danger level-btn" data-level="ERROR">ERROR</button>
+            <span class="log-toolbar-sep"></span>
+            <button class="btn btn-sm btn-outline-secondary type-btn active" data-type="ALL" data-i18n="webui.console.typeAll">全部</button>
+            <button class="btn btn-sm btn-outline-success type-btn" data-type="chat" data-i18n="webui.console.typeChat">聊天</button>
+            <button class="btn btn-sm btn-outline-warning type-btn" data-type="command" data-i18n="webui.console.typeCommand">命令</button>
+            <button class="btn btn-sm btn-outline-secondary" id="colorToggle" data-i18n="webui.console.colorOn">颜色</button>
+            <button class="btn btn-sm btn-outline-secondary" id="pauseBtn" data-i18n="webui.console.pause">暂停</button>
+            <button class="btn btn-sm btn-outline-secondary" id="clearLogBtn" data-i18n="webui.console.clear">清空</button>
+          </div>
+        </div>
+        <div class="log-stream" id="logStream"></div>
+        <div class="cmd-input-row" id="cmdInputRow">
+          <span class="cmd-prompt">&gt;</span>
+          <input type="text" class="cmd-input" id="cmdInput"
+                 placeholder="输入命令并回车执行..."
+                 maxlength="1000"
+                 data-i18n-placeholder="webui.console.cmdPlaceholder">
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var MAX_LOG_LINES = 1000;
+      var logBuffer = [];      // 全部已接收日志 {time, level, msg}
+      var paused = false;
+      var activeLevel = 'ALL';
+      var activeType = 'ALL';
+      var searchTerm = '';
+      var colorRender = true; // 颜色码渲染开关(默认开)
+      var sseController = null;   // AbortController
+      var sseReader = null;
+      var reconnectTimer = null;
+      var autoScroll = true;
+
+      var cmdHistory = [];
+      var historyIndex = -1;
+
+      var streamEl = document.getElementById('logStream');
+      var cmdInput;
+
+      /* ----- 工具 ----- */
+      function setConn(connected) {
+        var dot = document.getElementById('connDot');
+        var txt = document.getElementById('connStatus');
+        if (connected) {
+          dot.className = 'conn-dot live';
+          txt.textContent = WebUI.t('webui.console.connected', '已连接');
+        } else {
+          dot.className = 'conn-dot off';
+          txt.textContent = WebUI.t('webui.console.disconnected', '未连接');
+        }
+      }
+
+      function levelClass(level) {
+        var l = (level || '').toUpperCase();
+        if (l.indexOf('ERR') === 0) return 'ERROR';
+        if (l.indexOf('WARN') === 0) return 'WARN';
+        if (l.indexOf('INFO') === 0) return 'INFO';
+        if (l.indexOf('DEBUG') === 0) return 'DEBUG';
+        return 'INFO';
+      }
+
+      function passesFilter(entry) {
+        if (activeLevel !== 'ALL' && levelClass(entry.level) !== activeLevel) return false;
+        if (activeType !== 'ALL' && entry.type !== activeType) return false;
+        if (searchTerm && entry.msg.toLowerCase().indexOf(searchTerm) === -1) return false;
+        return true;
+      }
+
+      function appendLogLine(entry, isCommand) {
+        // isCommand=true 时为命令输入/输出，跳过过滤并不计入 logBuffer
+        if (!isCommand && !passesFilter(entry)) return;
+        var div = document.createElement('div');
+
+        if (entry.level === 'CMD') {
+          // 命令输入行：特殊高亮
+          div.className = 'log-line cmd-input-line';
+          div.innerHTML = '<span class="cmd-prompt-inline">' + WebUI.escapeHtml(entry.msg || '') + '</span>';
+        } else {
+          // 普通日志或命令输出
+          var level = entry.level || 'INFO';
+          var baseColor = colorizeLogLine(entry.msg || '', entry.level);
+          div.className = 'log-line lvl-' + level.toUpperCase();
+          var time = entry.time ? '<span class="log-time">' + WebUI.escapeHtml(entry.time) + '</span> ' : '';
+          var lvl = '<span class="log-level">[' + WebUI.escapeHtml(level) + ']</span> ';
+          // 先解析颜色码（输出 HTML span 标签），再渲染游戏图标
+          // parseMindustryColors 会保留 U+E800-U+F8FF 图标字符原样，renderGameIcons 再替换为 <span>/<img>
+          var msgHtml = colorRender ? WebUI.parseMindustryColors(entry.msg || '') : WebUI.escapeHtml(entry.msg || '');
+          // 无颜色码时用基础色包裹；有颜色码时由内层 span 控制颜色
+          if (msgHtml.indexOf('<span') < 0) {
+            msgHtml = '<span style="color:' + baseColor + '">' + msgHtml + '</span>';
+          }
+          msgHtml = renderGameIcons(msgHtml);
+          div.innerHTML = time + lvl + msgHtml;
+        }
+
+        streamEl.appendChild(div);
+        // 限制 DOM 节点数
+        while (streamEl.childNodes.length > MAX_LOG_LINES) {
+          streamEl.removeChild(streamEl.firstChild);
+        }
+        if (autoScroll && !paused) {
+          streamEl.scrollTop = streamEl.scrollHeight;
+        }
+      }
+
+      function colorizeLogLine(msg, level) {
+        // 返回基础色，parseMindustryColors 内的颜色码会覆盖
+        var lv = level || '';
+        if (lv === 'ERROR' || lv.indexOf('ERR') >= 0 || msg.indexOf('[E]') >= 0) {
+          return '#ff6b6b';
+        }
+        if (lv === 'WARN' || lv.indexOf('WARN') >= 0 || msg.indexOf('[W]') >= 0) {
+          return '#ffd93d';
+        }
+        if (lv === 'CMD_OUT') {
+          return '#a0d8ef';
+        }
+        return '#a0b8d0';  // INFO
+      }
+
+      function renderGameIcons(text) {
+        // UI 图标 (icon.ttf 矢量字形): 码点散布于 U+E800-U+F328, 外加 U+26A0 (warning)
+        // 内容图标 (sprite atlas 位图): U+F650-U+F8FF, 后端 /api/content-icon/<cp>.png 提供真实 PNG
+        return text
+          .replace(/([\uE800-\uF3FF\u26A0])/g, function (ch) {
+            return '<span class="game-icon-ui">' + ch + '</span>';
+          })
+          .replace(/([\uF650-\uF8FF])/g, function (ch) {
+            var cp = ch.charCodeAt(0);
+            return '<img class="content-icon" src="/api/content-icon/' + cp + '.png" onerror="this.outerHTML=\'<span class=&quot;game-icon&quot; title=&quot;' + WebUI.t('webui.console.iconTip', '图标 U+') + cp.toString(16).toUpperCase() + '&quot;>▪</span>\'" alt="">';
+          });
+      }
+
+      function rerenderAll() {
+        streamEl.innerHTML = '';
+        for (var i = 0; i < logBuffer.length; i++) {
+          appendLogLine(logBuffer[i]);
+        }
+        if (autoScroll) streamEl.scrollTop = streamEl.scrollHeight;
+      }
+
+      function pushLog(entry) {
+        if (!entry) return;
+        // 过滤 WebUI 命令输出日志（已通过 /api/command 返回，避免重复）
+        if (entry.msg && entry.msg.indexOf('[WebUI] 命令输出:') === 0) {
+          return;
+        }
+        logBuffer.push(entry);
+        if (logBuffer.length > MAX_LOG_LINES * 2) {
+          logBuffer = logBuffer.slice(-MAX_LOG_LINES);
+        }
+        appendLogLine(entry);
+      }
+
+      /* ----- SSE 连接（fetch 流式，支持 Bearer 认证） ----- */
+      function connectSSE() {
+        if (sseController) return;
+        var token = WebUI.getToken();
+        if (!token) return;
+        sseController = new AbortController();
+        setConn(false);
+        fetch('/api/logs/stream', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'text/event-stream' },
+          signal: sseController.signal
+        }).then(function (resp) {
+          if (!resp.ok || !resp.body) throw new Error('SSE ' + resp.status);
+          setConn(true);
+          sseReader = resp.body.getReader();
+          var decoder = new TextDecoder();
+          var buffer = '';
+          function pump() {
+            sseReader.read().then(function (chunk) {
+              if (chunk.done) { cleanupAndReconnect(); return; }
+              buffer += decoder.decode(chunk.value, { stream: true });
+              var parts = buffer.split('\n\n');
+              buffer = parts.pop();
+              for (var i = 0; i < parts.length; i++) {
+                handleSSEBlock(parts[i]);
+              }
+              pump();
+            }).catch(function (e) {
+              if (e.name !== 'AbortError') cleanupAndReconnect();
+            });
+          }
+          pump();
+        }).catch(function (e) {
+          if (e.name !== 'AbortError') cleanupAndReconnect();
+        });
+      }
+
+      function handleSSEBlock(block) {
+        var lines = block.split('\n');
+        var dataStr = '';
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          if (line.indexOf('data:') === 0) {
+            dataStr += line.slice(5).replace(/^\s/, '');
+          }
+        }
+        if (!dataStr) return;
+        try {
+          var obj = JSON.parse(dataStr);
+          pushLog(obj);
+        } catch (e) {
+          // 非 JSON，按纯文本处理
+          pushLog({ time: '', level: 'INFO', msg: dataStr });
+        }
+      }
+
+      function cleanupAndReconnect() {
+        if (sseReader) { try { sseReader.cancel(); } catch (e) {} sseReader = null; }
+        if (sseController) { sseController = null; }
+        setConn(false);
+        if (document.visibilityState === 'visible' && !reconnectTimer) {
+          reconnectTimer = setTimeout(function () {
+            reconnectTimer = null;
+            connectSSE();
+          }, 3000);
+        }
+      }
+
+      function disconnectSSE() {
+        if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+        if (sseReader) { try { sseReader.cancel(); } catch (e) {} sseReader = null; }
+        if (sseController) { try { sseController.abort(); } catch (e) {} sseController = null; }
+        setConn(false);
+      }
+
+      /* ----- 历史日志加载 ----- */
+      function loadHistory() {
+        var url = '/api/logs?limit=100';
+        WebUI.apiGet(url).then(function (data) {
+          var list = Array.isArray(data) ? data : (data && data.logs ? data.logs : []);
+          for (var i = 0; i < list.length; i++) {
+            var e = list[i];
+            if (typeof e === 'string') {
+              pushLog({ time: '', level: 'INFO', msg: e });
+            } else {
+              pushLog(e);
+            }
+          }
+        }).catch(function () {});
+      }
+
+      /* ----- 命令执行 ----- */
+      function execCommand() {
+        var cmd = cmdInput.value.trim();
+        if (!cmd) return;
+        if (cmd.length > 1000) { WebUI.toast(WebUI.t('webui.console.cmdTooLong', '命令过长'), 'error'); return; }
+        cmdHistory.push(cmd);
+        if (cmdHistory.length > 100) cmdHistory = cmdHistory.slice(-100);
+        historyIndex = cmdHistory.length;
+
+        // 命令输入直接追加到日志流
+        appendLogLine({ time: '', level: 'CMD', msg: '> ' + cmd }, true);
+
+        cmdInput.value = '';
+        var btn = document.getElementById('cmdExec');
+        if (btn) btn.disabled = true;
+
+        WebUI.apiPost('/api/command', { command: cmd }).then(function (res) {
+          // 命令异步执行，输出通过 SSE 日志流到达（Log.info → logBuffer → SSE）
+          // HTTP 响应只表示"已接收"，不等命令执行完
+          var success = res && res.success !== undefined ? res.success : true;
+          if (!success) {
+            appendLogLine({ time: '', level: 'ERROR', msg: WebUI.t('webui.console.failed', '执行失败') }, true);
+          }
+        }).catch(function (e) {
+          appendLogLine({ time: '', level: 'ERROR', msg: 'Error: ' + (e.message || WebUI.t('webui.console.failed', '执行失败')) }, true);
+        }).finally(function () {
+          if (btn) btn.disabled = false;
+        });
+      }
+
+      /* ----- 初始化 ----- */
+      WebUI.initPage('console', 'webui.console.title', '控制台').then(function () {
+        loadHistory();
+        connectSSE();
+
+        // 命令执行需要 webui.api.console 权限; 仅有日志权限的用户隐藏命令输入区
+        if (!WebUI.hasPerm('webui.api.console')) {
+          var cmdRow = document.getElementById('cmdInputRow');
+          if (cmdRow) cmdRow.style.display = 'none';
+        }
+
+        cmdInput = document.getElementById('cmdInput');
+        if (!cmdInput) return;
+
+        // 命令输入事件
+        cmdInput.addEventListener('keydown', function (e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            execCommand();
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (historyIndex > 0) {
+              historyIndex--;
+              cmdInput.value = cmdHistory[historyIndex] || '';
+            }
+          } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (historyIndex < cmdHistory.length - 1) {
+              historyIndex++;
+              cmdInput.value = cmdHistory[historyIndex] || '';
+            } else {
+              historyIndex = cmdHistory.length;
+              cmdInput.value = '';
+            }
+          }
+        });
+
+        // 暂停/继续
+        document.getElementById('pauseBtn').addEventListener('click', function () {
+          paused = !paused;
+          this.textContent = paused ? WebUI.t('webui.console.resume', '继续') : WebUI.t('webui.console.pause', '暂停');
+          this.classList.toggle('btn-warning', paused);
+        });
+
+        // 清空
+        document.getElementById('clearLogBtn').addEventListener('click', function () {
+          logBuffer = [];
+          streamEl.innerHTML = '';
+        });
+
+        // 搜索
+        document.getElementById('logSearch').addEventListener('input', function (e) {
+          searchTerm = e.target.value.trim().toLowerCase();
+          rerenderAll();
+        });
+
+        // 级别筛选
+        var levelBtns = document.querySelectorAll('.level-btn');
+        for (var i = 0; i < levelBtns.length; i++) {
+          levelBtns[i].addEventListener('click', function (e) {
+            for (var j = 0; j < levelBtns.length; j++) levelBtns[j].classList.remove('active');
+            e.currentTarget.classList.add('active');
+            activeLevel = e.currentTarget.getAttribute('data-level');
+            rerenderAll();
+          });
+        }
+
+        // 类型筛选(全部/聊天/命令): 按权限显示可用按钮
+        var typeBtns = document.querySelectorAll('.type-btn');
+        for (var i = 0; i < typeBtns.length; i++) {
+          var btn = typeBtns[i];
+          var t = btn.getAttribute('data-type');
+          var need = t === 'chat' ? 'webui.api.logsChat' : (t === 'command' ? 'webui.api.logsCommand' : null);
+          if (need && !WebUI.hasPerm(need)) {
+            btn.style.display = 'none';
+            continue;
+          }
+          btn.addEventListener('click', function (e) {
+            for (var j = 0; j < typeBtns.length; j++) typeBtns[j].classList.remove('active');
+            e.currentTarget.classList.add('active');
+            activeType = e.currentTarget.getAttribute('data-type');
+            rerenderAll();
+          });
+        }
+        // 颜色渲染开关(记忆到 localStorage)
+        var colorBtn = document.getElementById('colorToggle');
+        colorRender = localStorage.getItem('webui_log_color') !== '0';
+        colorBtn.textContent = colorRender ? WebUI.t('webui.console.colorOn', '颜色') : WebUI.t('webui.console.colorOff', '纯文本');
+        colorBtn.addEventListener('click', function () {
+          colorRender = !colorRender;
+          localStorage.setItem('webui_log_color', colorRender ? '1' : '0');
+          colorBtn.textContent = colorRender ? WebUI.t('webui.console.colorOn', '颜色') : WebUI.t('webui.console.colorOff', '纯文本');
+          rerenderAll();
+        });
+
+        // 自动滚动：用户手动滚动时取消自动跟随
+        streamEl.addEventListener('scroll', function () {
+          var atBottom = streamEl.scrollHeight - streamEl.scrollTop - streamEl.clientHeight < 30;
+          autoScroll = atBottom;
+        });
+      });
+
+      // 可见性管理
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          disconnectSSE();
+        } else {
+          connectSSE();
+        }
+      });
+
+      window.addEventListener('beforeunload', disconnectSSE);
+    })();
+  </script>
+</body>
+</html>

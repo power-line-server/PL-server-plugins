@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.players.title">玩家管理 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 1.1rem; line-height: 1; }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; }
+    .webui-card { background: var(--card-bg); backdrop-filter: var(--glass-blur); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); }
+    .table { margin-bottom: 0; }
+    .table thead th { background: var(--table-head-bg); font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
+    .table td { font-size: 0.9rem; vertical-align: middle; color: var(--text); }
+    .table-wrap { overflow-x: auto; }
+    .empty-row td { text-align: center; color: var(--text-muted); padding: 2rem; }
+    .player-name { font-weight: 600; color: var(--text); }
+    .uuid-cell { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; color: var(--text-muted); }
+    .nav-tabs .nav-link { color: var(--text-muted); font-weight: 500; }
+    .nav-tabs .nav-link.active { color: var(--webui-primary); font-weight: 600; }
+    .refresh-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+  </style>
+</head>
+<body>
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <!-- 玩家搜索 -->
+      <div class="webui-card p-3 mb-3">
+        <div class="input-group">
+          <span class="input-group-text">🔍</span>
+          <input type="text" class="form-control" id="playerSearchInput"
+                 placeholder="搜索玩家名称/UID/UUID..."
+                 data-i18n-placeholder="webui.players.search.placeholder">
+        </div>
+        <div id="searchResultsContainer" style="display:none;">
+          <div class="d-flex justify-content-between align-items-center mt-2 mb-1">
+            <small class="text-muted"><span id="searchResultCount">0</span> <span data-i18n="webui.players.search.resultCount">条结果</span></small>
+            <button class="btn btn-sm btn-outline-secondary" id="clearSearchBtn" data-i18n="webui.players.search.clear">清除</button>
+          </div>
+          <div class="table-wrap" style="max-height: 400px; overflow-y: auto;">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th data-i18n="webui.players.table.name">名称</th>
+                  <th data-i18n="webui.players.table.uid">UID</th>
+                  <th data-i18n="webui.players.table.uuid">UUID</th>
+                  <th data-i18n="webui.players.table.status">状态</th>
+                  <th data-i18n="webui.players.table.actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="searchResultsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-players" data-bs-toggle="tab" data-bs-target="#pane-players" type="button" role="tab" data-i18n="webui.players.tab.online">在线玩家</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-bans" data-bs-toggle="tab" data-bs-target="#pane-bans" type="button" role="tab" data-i18n="webui.players.tab.bans">封禁列表</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- 在线玩家 -->
+        <div class="tab-pane fade show active" id="pane-players" role="tabpanel">
+          <div class="webui-card p-3">
+            <div class="refresh-bar">
+              <div><span data-i18n="webui.players.online.count">在线人数：</span><span id="onlineCount">0</span></div>
+              <button class="btn btn-sm btn-outline-secondary" id="refreshPlayers" data-i18n="webui.common.refresh">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th data-i18n="webui.players.table.name">名称</th>
+                    <th data-i18n="webui.players.table.uuid">UUID / ShortID</th>
+                    <th data-i18n="webui.players.table.ip">IP</th>
+                    <th data-i18n="webui.players.table.lang">语言</th>
+                    <th data-i18n="webui.players.table.timezone">时区</th>
+                    <th data-i18n="webui.players.table.actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="playersBody">
+                  <tr class="empty-row"><td colspan="6" data-i18n="webui.players.online.loading">加载中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 封禁列表 -->
+        <div class="tab-pane fade" id="pane-bans" role="tabpanel">
+          <div class="webui-card p-3">
+            <div class="refresh-bar">
+              <div><span data-i18n="webui.players.bans.count">封禁记录：</span><span id="banCount">0</span></div>
+              <button class="btn btn-sm btn-outline-secondary" id="refreshBans" data-i18n="webui.common.refresh">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th data-i18n="webui.players.bans.id">记录ID</th>
+                    <th data-i18n="webui.players.bans.target">目标</th>
+                    <th data-i18n="webui.players.bans.operator">封禁者</th>
+                    <th data-i18n="webui.players.bans.reason">原因</th>
+                    <th data-i18n="webui.players.bans.remaining">剩余时间</th>
+                    <th data-i18n="webui.players.table.actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="bansBody">
+                  <tr class="empty-row"><td colspan="6" data-i18n="webui.players.bans.loading">加载中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 封禁模态框 -->
+  <div class="modal fade" id="banModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="webui.players.ban.title">封禁玩家</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label" data-i18n="webui.players.ban.target">目标（名称 / #id / shortId）</label>
+            <input type="text" class="form-control" id="banTarget" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="webui.players.ban.duration">时长（分钟，0 为永久）</label>
+            <input type="number" class="form-control" id="banTime" value="60" min="0">
+          </div>
+          <div class="mb-3">
+            <label class="form-label" data-i18n="webui.players.ban.reason">原因（最多 200 字符）</label>
+            <textarea class="form-control" id="banReason" rows="3" maxlength="200"></textarea>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="banIp">
+            <label class="form-check-label" for="banIp" data-i18n="webui.players.ban.banIp">同时封禁 IP</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="webui.common.cancel">取消</button>
+          <button type="button" class="btn btn-danger" id="banConfirm" data-i18n="webui.players.ban.confirm">确认封禁</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 玩家详情模态框 -->
+  <div class="modal fade" id="detailModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="webui.players.detail.title">玩家详情</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-2">
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.name">名称：</strong><span id="detailName"></span> <button class="btn btn-sm btn-link p-0 copy-btn" data-copy-target="detailName" title="复制" data-i18n-title="webui.common.copy">📋</button></div>
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.rawName">原始名：</strong><span id="detailRawName"></span> <button class="btn btn-sm btn-link p-0 copy-btn" data-copy-target="detailRawName" title="复制" data-i18n-title="webui.common.copy">📋</button></div>
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.uid">UID：</strong><span id="detailUid"></span> <button class="btn btn-sm btn-link p-0 copy-btn" data-copy-target="detailUid" title="复制" data-i18n-title="webui.common.copy">📋</button></div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.status">状态：</strong><span id="detailStatus"></span></div>
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.banCount">封禁次数：</strong><span id="detailBanCount"></span></div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.uuid">UUID：</strong><span id="detailUuid" class="uuid-cell"></span> <button class="btn btn-sm btn-link p-0 copy-btn" data-copy-target="detailUuid" title="复制" data-i18n-title="webui.common.copy">📋</button></div>
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.ip">IP：</strong><span id="detailIp"></span> <button class="btn btn-sm btn-link p-0 copy-btn" data-copy-target="detailIp" title="复制" data-i18n-title="webui.common.copy">📋</button></div>
+          </div>
+          <hr>
+          <h6 data-i18n="webui.players.detail.onlineInfo">在线信息</h6>
+          <div class="row mb-2">
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.clientLang">客户端语言：</strong><span id="detailClientLang"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.serverLang">服务端语言：</strong><span id="detailServerLang"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.timezone">时区：</strong><span id="detailTimezone"></span></div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.clientType">自定义客户端：</strong><span id="detailClientType"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.mobile">移动端：</strong><span id="detailMobile"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.team">队伍：</strong><span id="detailTeam"></span></div>
+          </div>
+          <hr>
+          <h6 data-i18n="webui.players.detail.recordInfo">历史记录</h6>
+          <div class="row mb-2">
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.joinCount">加入次数：</strong><span id="detailJoinCount"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.totalDays">在线天数：</strong><span id="detailTotalDays"></span></div>
+            <div class="col-md-4"><strong data-i18n="webui.players.detail.obCount">强制观战：</strong><span id="detailObCount"></span></div>
+          </div>
+          <div class="row mb-2">
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.firstJoin">首次加入：</strong><span id="detailFirstJoin"></span></div>
+            <div class="col-md-6"><strong data-i18n="webui.players.detail.lastLeave">最后离开：</strong><span id="detailLastLeave"></span></div>
+          </div>
+          <hr>
+          <ul class="nav nav-tabs mb-2" role="tablist">
+            <li class="nav-item" role="presentation">
+              <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-nameHistory" type="button" data-i18n="webui.players.detail.nameHistory">名称历史</button>
+            </li>
+            <li class="nav-item" role="presentation">
+              <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-ipHistory" type="button" data-i18n="webui.players.detail.ipHistory">IP 历史</button>
+            </li>
+          </ul>
+          <div class="tab-content">
+            <div class="tab-pane fade show active" id="pane-nameHistory" role="tabpanel">
+              <div class="table-wrap" style="max-height: 240px; overflow-y: auto;">
+                <table class="table table-sm">
+                  <thead><tr><th data-i18n="webui.players.detail.historyName">名称</th><th data-i18n="webui.players.detail.historyTime">时间</th></tr></thead>
+                  <tbody id="detailNameHistoryBody"></tbody>
+                </table>
+              </div>
+              <div id="nameHistoryPagination" class="d-flex justify-content-between align-items-center mt-2" style="display:none;">
+                <small class="text-muted"><span id="nameHistoryPageInfo">1 / 1</span></small>
+                <div>
+                  <button class="btn btn-sm btn-outline-secondary me-1" id="nameHistoryPrev">‹</button>
+                  <button class="btn btn-sm btn-outline-secondary" id="nameHistoryNext">›</button>
+                </div>
+              </div>
+            </div>
+            <div class="tab-pane fade" id="pane-ipHistory" role="tabpanel">
+              <div class="table-wrap" style="max-height: 240px; overflow-y: auto;">
+                <table class="table table-sm">
+                  <thead><tr><th data-i18n="webui.players.detail.historyIp">IP</th><th data-i18n="webui.players.detail.historyTime">时间</th></tr></thead>
+                  <tbody id="detailIpHistoryBody"></tbody>
+                </table>
+              </div>
+              <div id="ipHistoryPagination" class="d-flex justify-content-between align-items-center mt-2" style="display:none;">
+                <small class="text-muted"><span id="ipHistoryPageInfo">1 / 1</span></small>
+                <div>
+                  <button class="btn btn-sm btn-outline-secondary me-1" id="ipHistoryPrev">‹</button>
+                  <button class="btn btn-sm btn-outline-secondary" id="ipHistoryNext">›</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="webui.common.close">关闭</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var pollTimer = null;
+      var banModal = null;
+      var detailModal = null;
+
+      function renderPlayers(list) {
+        var body = document.getElementById('playersBody');
+        document.getElementById('onlineCount').textContent = (list && list.length) || 0;
+        if (!list || !list.length) {
+          body.innerHTML = '<tr class="empty-row"><td colspan="6">' +
+            WebUI.t('webui.players.online.empty', '暂无在线玩家') + '</td></tr>';
+          return;
+        }
+        body.innerHTML = list.map(function (p) {
+          var uuid = p.uuid || '-';
+          var short = p.shortId !== undefined && p.shortId !== null ? ('#' + p.shortId) : '';
+          var uuidCell = WebUI.escapeHtml(uuid) + (short ? ' <span class="badge bg-secondary">' + WebUI.escapeHtml(short) + '</span>' : '');
+          return '<tr>' +
+            '<td class="player-name">' + WebUI.escapeHtml(p.name || '-') + '</td>' +
+            '<td class="uuid-cell">' + uuidCell + '</td>' +
+            '<td>' + WebUI.escapeHtml(p.ip || '-') + '</td>' +
+            '<td>' + WebUI.escapeHtml(p.lang || '-') + '</td>' +
+            '<td>' + WebUI.escapeHtml(p.timezone || '-') + '</td>' +
+            '<td>' +
+              '<button class="btn btn-sm btn-info me-1" onclick="WebUIpage.detail(\'' + WebUI.escapeHtml(p.uuid || '') + '\')">' + WebUI.icon('info', 14) + ' ' + WebUI.t('webui.players.action.detail', '详情') + '</button>' +
+              '<button class="btn btn-sm btn-danger" onclick="WebUIpage.ban(\'' + WebUI.escapeHtml(p.name || '') + '\')">' + WebUI.icon('ban', 14) + ' ' + WebUI.t('webui.players.action.ban', '封禁') + '</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      function formatRemaining(endTime) {
+        if (!endTime) return WebUI.t('webui.players.bans.permanent', '永久');
+        var now = Date.now();
+        var end = new Date(endTime).getTime();
+        if (isNaN(end)) return '-';
+        if (end <= now) return WebUI.t('webui.players.bans.expired', '已过期');
+        return WebUI.formatUptime(Math.floor((end - now) / 1000));
+      }
+
+      function formatTs(ts) {
+        // ts 为 epoch 秒
+        if (!ts) return '-';
+        var d = new Date(ts * 1000);
+        if (isNaN(d.getTime())) return String(ts);
+        var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+        return d.getFullYear() + '/' + (d.getMonth() + 1) + '/' + d.getDate() + '-' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+      }
+
+      function renderBans(list) {
+        var body = document.getElementById('bansBody');
+        document.getElementById('banCount').textContent = (list && list.length) || 0;
+        if (!list || !list.length) {
+          body.innerHTML = '<tr class="empty-row"><td colspan="6">' +
+            WebUI.t('webui.players.bans.empty', '暂无封禁记录') + '</td></tr>';
+          return;
+        }
+        body.innerHTML = list.map(function (b) {
+          var id = b.recordId !== undefined ? b.recordId : (b.id || '-');
+          return '<tr>' +
+            '<td class="uuid-cell">' + WebUI.escapeHtml(String(id)) + '</td>' +
+            '<td class="player-name">' + WebUI.escapeHtml(b.targetName || b.target || '-') + '</td>' +
+            '<td>' + WebUI.escapeHtml(b.operatorName || b.operator || '-') + '</td>' +
+            '<td>' + WebUI.escapeHtml(b.reason || '-') + '</td>' +
+            '<td>' + formatRemaining(b.endTime) + '</td>' +
+            '<td><button class="btn btn-sm btn-success" onclick="WebUIpage.unban(\'' + WebUI.escapeHtml(String(id)) + '\')">' + WebUI.icon('unban', 14) + ' ' + WebUI.t('webui.players.action.unban', '解封') + '</button></td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      function fetchPlayers() {
+        WebUI.apiGet('/api/players').then(renderPlayers).catch(function () {
+          document.getElementById('playersBody').innerHTML = '<tr class="empty-row"><td colspan="6">' +
+            WebUI.t('webui.common.loadFailed', '加载失败') + '</td></tr>';
+        });
+      }
+      function fetchBans() {
+        WebUI.apiGet('/api/bans').then(renderBans).catch(function () {
+          document.getElementById('bansBody').innerHTML = '<tr class="empty-row"><td colspan="6">' +
+            WebUI.t('webui.common.loadFailed', '加载失败') + '</td></tr>';
+        });
+      }
+
+      // ===== 玩家搜索 =====
+      function renderSearchResults(list) {
+        var container = document.getElementById('searchResultsContainer');
+        var body = document.getElementById('searchResultsBody');
+        var countEl = document.getElementById('searchResultCount');
+        if (!list || !list.length) {
+          container.style.display = 'block';
+          countEl.textContent = '0';
+          body.innerHTML = '<tr class="empty-row"><td colspan="5">' +
+            WebUI.t('webui.players.search.noResult', '无匹配结果') + '</td></tr>';
+          return;
+        }
+        container.style.display = 'block';
+        countEl.textContent = list.length;
+        body.innerHTML = list.map(function (p) {
+          var online = p.online === true;
+          var statusBadge = online
+            ? '<span class="badge bg-success">' + WebUI.t('webui.players.detail.online', '在线') + '</span>'
+            : '<span class="badge bg-secondary">' + WebUI.t('webui.players.detail.offline', '离线') + '</span>';
+          var uid = (p.uid !== undefined && p.uid !== null) ? p.uid : '-';
+          return '<tr>' +
+            '<td class="player-name">' + WebUI.escapeHtml(p.name || '-') + '</td>' +
+            '<td>' + WebUI.escapeHtml(String(uid)) + '</td>' +
+            '<td class="uuid-cell">' + WebUI.escapeHtml(p.uuid || '-') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td><button class="btn btn-sm btn-info" onclick="WebUIpage.detail(\'' + WebUI.escapeHtml(p.uuid || '') + '\')">' + WebUI.icon('info', 14) + ' ' + WebUI.t('webui.players.action.detail', '详情') + '</button></td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      var searchDebounced = WebUI.debounce(function (q) {
+        if (!q) {
+          document.getElementById('searchResultsContainer').style.display = 'none';
+          return;
+        }
+        WebUI.apiGet('/api/players/search?q=' + encodeURIComponent(q)).then(function (data) {
+          renderSearchResults(data || []);
+        }).catch(function () {
+          renderSearchResults([]);
+        });
+      }, 300);
+
+      // ===== 历史记录分页 =====
+      var detailState = { nameHistory: [], ipHistory: [], namePage: 1, ipPage: 1, historyPageSize: 10 };
+
+      function renderNameHistoryPage() {
+        var data = detailState.nameHistory;
+        var ps = detailState.historyPageSize;
+        var totalPages = Math.ceil(data.length / ps) || 1;
+        if (detailState.namePage > totalPages) detailState.namePage = totalPages;
+        if (detailState.namePage < 1) detailState.namePage = 1;
+        var start = (detailState.namePage - 1) * ps;
+        var pageData = data.slice(start, start + ps);
+        var body = document.getElementById('detailNameHistoryBody');
+        body.innerHTML = pageData.length ? pageData.map(function (e) {
+          return '<tr><td>' + WebUI.escapeHtml(e.name || '-') + '</td><td>' + (e.firstSeenTime ? formatTs(e.firstSeenTime) : '-') + '</td></tr>';
+        }).join('') : '<tr><td colspan="2" class="text-muted">' + WebUI.t('webui.players.detail.noHistory', '无记录') + '</td></tr>';
+        var pagEl = document.getElementById('nameHistoryPagination');
+        if (data.length > ps) {
+          pagEl.style.display = 'flex';
+          document.getElementById('nameHistoryPageInfo').textContent = detailState.namePage + ' / ' + totalPages;
+          document.getElementById('nameHistoryPrev').disabled = (detailState.namePage <= 1);
+          document.getElementById('nameHistoryNext').disabled = (detailState.namePage >= totalPages);
+        } else {
+          pagEl.style.display = 'none';
+        }
+      }
+      function renderIpHistoryPage() {
+        var data = detailState.ipHistory;
+        var ps = detailState.historyPageSize;
+        var totalPages = Math.ceil(data.length / ps) || 1;
+        if (detailState.ipPage > totalPages) detailState.ipPage = totalPages;
+        if (detailState.ipPage < 1) detailState.ipPage = 1;
+        var start = (detailState.ipPage - 1) * ps;
+        var pageData = data.slice(start, start + ps);
+        var body = document.getElementById('detailIpHistoryBody');
+        body.innerHTML = pageData.length ? pageData.map(function (e) {
+          return '<tr><td>' + WebUI.escapeHtml(e.ip || '-') + '</td><td>' + (e.firstSeenTime ? formatTs(e.firstSeenTime) : '-') + '</td></tr>';
+        }).join('') : '<tr><td colspan="2" class="text-muted">' + WebUI.t('webui.players.detail.noHistory', '无记录') + '</td></tr>';
+        var pagEl = document.getElementById('ipHistoryPagination');
+        if (data.length > ps) {
+          pagEl.style.display = 'flex';
+          document.getElementById('ipHistoryPageInfo').textContent = detailState.ipPage + ' / ' + totalPages;
+          document.getElementById('ipHistoryPrev').disabled = (detailState.ipPage <= 1);
+          document.getElementById('ipHistoryNext').disabled = (detailState.ipPage >= totalPages);
+        } else {
+          pagEl.style.display = 'none';
+        }
+      }
+
+      window.WebUIpage = {
+        ban: function (target) {
+          document.getElementById('banTarget').value = target || '';
+          document.getElementById('banTime').value = 60;
+          document.getElementById('banReason').value = '';
+          document.getElementById('banIp').checked = false;
+          banModal.show();
+        },
+        unban: function (id) {
+          if (!confirm(WebUI.t('webui.players.bans.confirmUnban', '确认解封该玩家？'))) return;
+          WebUI.apiDelete('/api/bans/' + encodeURIComponent(id)).then(function () {
+            WebUI.toast(WebUI.t('webui.players.bans.unbanned', '已解封'), 'success');
+            fetchBans();
+          }).catch(function (e) { WebUI.toast(e.message || WebUI.t('webui.players.bans.unbanFailed', '解封失败'), 'error'); });
+        },
+        detail: function (uuid) {
+          if (!uuid) return;
+          WebUI.apiGet('/api/player/detail?uuid=' + encodeURIComponent(uuid)).then(function (res) {
+            var d = res.data || res || {};
+            var setText = function (id, v) { document.getElementById(id).textContent = (v === undefined || v === null) ? '-' : v; };
+            setText('detailName', d.name);
+            setText('detailRawName', d.rawName);
+            setText('detailUid', d.uid);
+            setText('detailStatus', d.online ? WebUI.t('webui.players.detail.online', '在线') : WebUI.t('webui.players.detail.offline', '离线'));
+            setText('detailBanCount', d.banCount);
+            setText('detailUuid', d.uuid);
+            setText('detailIp', d.ip);
+            setText('detailClientLang', d.clientLang);
+            setText('detailServerLang', d.serverLang);
+            setText('detailTimezone', d.timezone);
+            setText('detailClientType', d.clientType);
+            setText('detailMobile', d.mobile === true ? WebUI.t('webui.common.yes', '是') : (d.mobile === false ? WebUI.t('webui.common.no', '否') : '-'));
+            setText('detailTeam', d.team);
+            setText('detailJoinCount', d.joinCount);
+            setText('detailTotalDays', d.totalOnlineSeconds !== undefined ? Math.floor(d.totalOnlineSeconds / 86400) : '-');
+            setText('detailObCount', d.forcedObCount);
+            setText('detailFirstJoin', d.firstJoinTime ? formatTs(d.firstJoinTime) : '-');
+            setText('detailLastLeave', d.lastLeaveTime ? formatTs(d.lastLeaveTime) : '-');
+            // 名称历史 (分页)
+            detailState.nameHistory = d.nameHistory || [];
+            detailState.namePage = 1;
+            renderNameHistoryPage();
+            // IP 历史 (分页)
+            detailState.ipHistory = d.ipHistory || [];
+            detailState.ipPage = 1;
+            renderIpHistoryPage();
+            detailModal.show();
+          }).catch(function (e) { WebUI.toast(e.message || WebUI.t('webui.players.detail.loadFailed', '加载详情失败'), 'error'); });
+        }
+      };
+
+      WebUI.initPage('players', 'webui.players.title', '玩家管理').then(function () {
+        banModal = new bootstrap.Modal(document.getElementById('banModal'));
+        detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+        fetchPlayers();
+        fetchBans();
+        pollTimer = setInterval(function () {
+          fetchPlayers();
+          fetchBans();
+        }, 5000);
+
+        document.getElementById('refreshPlayers').addEventListener('click', fetchPlayers);
+        document.getElementById('refreshBans').addEventListener('click', fetchBans);
+
+        document.getElementById('banConfirm').addEventListener('click', function () {
+          var target = document.getElementById('banTarget').value.trim();
+          var time = parseInt(document.getElementById('banTime').value, 10) || 0;
+          var reason = document.getElementById('banReason').value.trim();
+          var banIp = document.getElementById('banIp').checked;
+          if (!target) { WebUI.toast(WebUI.t('webui.players.ban.targetRequired', '请输入封禁目标'), 'error'); return; }
+          WebUI.apiPost('/api/ban', { target: target, time: time, reason: reason, banIp: banIp }).then(function () {
+            WebUI.toast(WebUI.t('webui.players.ban.success', '封禁成功'), 'success');
+            banModal.hide();
+            fetchPlayers();
+            fetchBans();
+          }).catch(function (e) { WebUI.toast(e.message || WebUI.t('webui.players.ban.banFailed', '封禁失败'), 'error'); });
+        });
+
+        // 玩家搜索 (300ms 防抖)
+        var searchInput = document.getElementById('playerSearchInput');
+        if (searchInput) {
+          searchInput.addEventListener('input', function () {
+            var q = this.value.trim();
+            if (!q) {
+              document.getElementById('searchResultsContainer').style.display = 'none';
+              return;
+            }
+            searchDebounced(q);
+          });
+        }
+        var clearSearchBtn = document.getElementById('clearSearchBtn');
+        if (clearSearchBtn) {
+          clearSearchBtn.addEventListener('click', function () {
+            if (searchInput) searchInput.value = '';
+            document.getElementById('searchResultsContainer').style.display = 'none';
+          });
+        }
+
+        // 复制按钮 (详情 modal 内 name/UID/IP/UUID)
+        document.querySelectorAll('.copy-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var targetId = this.getAttribute('data-copy-target');
+            var el = document.getElementById(targetId);
+            if (!el) return;
+            var text = el.textContent;
+            if (!text || text === '-') { WebUI.toast(WebUI.t('webui.players.detail.nothingToCopy', '无内容可复制'), 'error'); return; }
+            WebUI.copyToClipboard(text).then(function () {
+              WebUI.toast(WebUI.t('webui.common.copied', '已复制到剪贴板'), 'success');
+            }).catch(function () {
+              WebUI.toast(WebUI.t('webui.common.copyFailed', '复制失败'), 'error');
+            });
+          });
+        });
+
+        // 历史记录分页按钮
+        document.getElementById('nameHistoryPrev').addEventListener('click', function () {
+          detailState.namePage--; renderNameHistoryPage();
+        });
+        document.getElementById('nameHistoryNext').addEventListener('click', function () {
+          detailState.namePage++; renderNameHistoryPage();
+        });
+        document.getElementById('ipHistoryPrev').addEventListener('click', function () {
+          detailState.ipPage--; renderIpHistoryPage();
+        });
+        document.getElementById('ipHistoryNext').addEventListener('click', function () {
+          detailState.ipPage++; renderIpHistoryPage();
+        });
+      });
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        } else if (!pollTimer) {
+          fetchPlayers();
+          fetchBans();
+          pollTimer = setInterval(function () { fetchPlayers(); fetchBans(); }, 5000);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

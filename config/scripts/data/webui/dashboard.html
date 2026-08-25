@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.dashboard.title">仪表盘 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: var(--webui-sidebar-w);
+      background: var(--sidebar-bg);
+      backdrop-filter: var(--glass-blur);
+      color: var(--sidebar-text);
+      display: flex; flex-direction: column; z-index: 1030;
+    }
+    .sidebar-brand {
+      padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600;
+      color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link {
+      display: flex; align-items: center; gap: 0.6rem;
+      padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none;
+      border: none; border-radius: 0; background: transparent;
+      width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer;
+    }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 1.1rem; line-height: 1; }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar {
+      position: sticky; top: 0; z-index: 1020;
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border);
+      backdrop-filter: var(--glass-blur);
+    }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; }
+    .webui-card {
+      background: var(--card-bg); backdrop-filter: var(--glass-blur);
+      border-radius: var(--webui-card-radius);
+      box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border);
+    }
+    .stat-card { padding: 1.25rem; height: 100%; }
+    .stat-label { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem; }
+    .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .stat-sub { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .progress { height: 8px; margin-top: 0.6rem; background: #e9ecef; }
+    .info-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
+    .info-row:last-child { border-bottom: none; }
+    .info-row .k { color: var(--text-muted); }
+    .info-row .v { color: var(--text); font-weight: 500; }
+    .card-title-bar { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text); }
+    .text-tps-good { color: #198754; } .text-tps-mid { color: #ffc107; } .text-tps-bad { color: #dc3545; }
+    .map-thumb {
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .map-thumb-container {
+      background: var(--card-bg);
+      border-radius: var(--webui-card-radius);
+      padding: 0.5rem;
+    }
+    @media (max-width: 991.98px) {
+      .app-sidebar { display: none; }
+      .app-main { margin-left: 0; }
+    }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+  </style>
+</head>
+<body>
+  <!-- PC 侧边栏 -->
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <!-- 移动端 offcanvas -->
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <!-- 状态卡片网格 -->
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.tps">TPS</div>
+            <div class="stat-value" id="statTps">--</div>
+            <div class="progress"><div class="progress-bar" id="tpsBar" role="progressbar" style="width:0%"></div></div>
+            <div class="stat-sub" id="tpsSub">0 / 60</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.memory">内存使用</div>
+            <div class="stat-value" id="statMem">-- MB</div>
+            <div class="progress"><div class="progress-bar bg-info" id="memBar" role="progressbar" style="width:0%"></div></div>
+            <div class="stat-sub" id="memSub">0 / 0 MB</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.players">在线玩家</div>
+            <div class="stat-value" id="statPlayers">--</div>
+
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.sinceBoot">开服至今</div>
+            <div class="stat-value" id="statUptime">--</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.allUnits">总单位数</div>
+            <div class="stat-value" id="statAllUnits">--</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.enemies">敌人数</div>
+            <div class="stat-value" id="statEnemies">--</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.mapId">地图ID</div>
+            <div class="stat-value" id="statMapId">--</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.mapMode">地图模式</div>
+            <div class="stat-value" id="statMapMode">--</div>
+          </div>
+        </div>
+        <div class="col-12 col-sm-6 col-xl-3">
+          <div class="webui-card stat-card">
+            <div class="stat-label" data-i18n="webui.dashboard.allBans">被封禁总数</div>
+            <div class="stat-value" id="statAllBans">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 地图与版本信息 -->
+      <div class="row g-3">
+        <div class="col-12 col-lg-7">
+          <div class="webui-card p-3 p-md-4">
+            <div class="card-title-bar">
+              <span data-icon="maps"></span><span data-i18n="webui.dashboard.mapInfo">当前地图</span>
+            </div>
+            <div class="map-thumb-container mb-3 text-center position-relative">
+              <img id="mapThumb" src="" alt="地图缩略图" data-i18n-alt="webui.dashboard.mapThumbAlt" class="map-thumb img-fluid rounded" style="max-width: 100%; max-height: 200px; display: none; cursor: pointer;">
+              <button class="btn btn-sm btn-outline-secondary position-absolute top-0 end-0 m-1" id="refreshThumbBtn" title="刷新缩略图" data-i18n-title="webui.dashboard.refreshThumb" style="display: none;">↻</button>
+            </div>
+            <div class="info-row"><span class="k" data-i18n="webui.dashboard.mapName">地图名称</span><span class="v" id="mapName">-</span></div>
+            <div class="info-row"><span class="k" data-i18n="webui.dashboard.mapAuthor">作者</span><span class="v" id="mapAuthor">-</span></div>
+            <div class="info-row"><span class="k" data-i18n="webui.dashboard.mapSize">尺寸</span><span class="v" id="mapSize">-</span></div>
+            <div class="info-row"><span class="k" data-i18n="webui.dashboard.wave">当前波次</span><span class="v" id="mapWave">-</span></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-5">
+          <div class="webui-card p-3 p-md-4">
+            <div class="card-title-bar">
+              <span data-icon="info"></span><span data-i18n="webui.dashboard.serverInfo">服务器信息</span>
+            </div>
+            <div class="info-row"><span class="k" data-i18n="webui.dashboard.serverVersion">服务器版本</span><span class="v" id="serverVersion">-</span></div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-5 mt-3">
+          <div class="webui-card p-3 p-md-4">
+            <div class="card-title-bar">
+              <span data-icon="info"></span><span data-i18n="webui.dashboard.dailyQuote">每日一言</span>
+              <button class="btn btn-sm btn-outline-secondary ms-2" id="refreshQuoteBtn" title="刷新" data-i18n-title="webui.common.refresh">↻</button>
+              <button class="btn btn-sm btn-outline-secondary ms-1" id="copyQuoteBtn" title="复制" data-i18n-title="webui.common.copy">📋</button>
+            </div>
+            <div id="dailyQuote" class="mt-2" data-i18n="webui.dashboard.loading" style="min-height: 2.5rem; font-style: italic; color: var(--text-muted);">加载中...</div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 缩略图预览 Modal -->
+    <div id="thumbModal" class="thumb-modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:9999;justify-content:center;align-items:center;cursor:pointer;">
+      <img id="thumbModalImg" src="" alt="地图大图" data-i18n-alt="webui.dashboard.mapThumbLarge" style="max-width:95%;max-height:95%;border-radius:8px;box-shadow:0 4px 30px rgba(0,0,0,0.5);cursor:grab;transition:none;">
+    </div>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var pollTimer = null;
+
+      function setText(id, val) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = val;
+      }
+
+      function renderStatus(s) {
+        if (!s) return;
+        // TPS
+        var tps = Number(s.tps) || 0;
+        setText('statTps', tps.toFixed(1));
+        var tpsBar = document.getElementById('tpsBar');
+        var pct = Math.min(100, (tps / 60) * 100);
+        tpsBar.style.width = pct + '%';
+        tpsBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+        var tpsVal = document.getElementById('statTps');
+        tpsVal.classList.remove('text-tps-good', 'text-tps-mid', 'text-tps-bad');
+        if (tps >= 50) { tpsBar.classList.add('bg-success'); tpsVal.classList.add('text-tps-good'); }
+        else if (tps >= 30) { tpsBar.classList.add('bg-warning'); tpsVal.classList.add('text-tps-mid'); }
+        else { tpsBar.classList.add('bg-danger'); tpsVal.classList.add('text-tps-bad'); }
+        setText('tpsSub', tps.toFixed(0) + ' / 60');
+
+        // 内存
+        var used = Number(s.memoryUsed) || 0;
+        var total = Number(s.memoryTotal) || 0;
+        setText('statMem', used + ' MB');
+        var memBar = document.getElementById('memBar');
+        var memPct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+        memBar.style.width = memPct + '%';
+        setText('memSub', used + ' / ' + total + ' MB');
+
+        // 玩家
+        var online = Number(s.playersOnline) || 0;
+        setText('statPlayers', online);
+        // 玩家人数已由上方数字显示，无需额外文本
+
+        // 运行时长
+        setText('statUptime', WebUI.formatUptime(s.uptime));
+
+        // 地图信息
+        setText('mapName', s.mapName || '-');
+        setText('mapAuthor', s.mapAuthor || '-');
+        setText('mapSize', (s.mapWidth && s.mapHeight) ? (s.mapWidth + ' × ' + s.mapHeight) : '-');
+        setText('mapWave', (s.wave !== undefined && s.wave !== null) ? s.wave : '-');
+
+        // 新增字段
+        setText('statAllUnits', (s.allUnits !== undefined && s.allUnits !== null) ? s.allUnits : '-');
+        setText('statEnemies', (s.enemies === null || s.enemies === undefined) ? '-' : s.enemies);
+        setText('statMapId', s.mapId || '-');
+        setText('statMapMode', s.mapMode || '-');
+        setText('statAllBans', (s.allBans !== undefined && s.allBans !== null) ? s.allBans : '-');
+
+        // 服务器信息
+        setText('serverVersion', s.serverVersion || '-');
+
+        // 加载当前世界实时快照（仅在首次加载时设置 src，避免轮询覆盖刷新按钮的时间戳）
+        var mapThumb = document.getElementById('mapThumb');
+        var refreshBtn = document.getElementById('refreshThumbBtn');
+        if (mapThumb && !mapThumb.dataset.loaded) {
+          mapThumb.src = '/api/world/snapshot?t=' + Date.now();
+          mapThumb.style.display = 'inline-block';
+          mapThumb.onerror = function() { this.style.display = 'none'; };
+          mapThumb.dataset.loaded = '1';
+          if (refreshBtn) {
+            refreshBtn.style.display = 'inline-block';
+          }
+        }
+      }
+
+      function fetchStatus() {
+        WebUI.apiGet('/api/status').then(function (data) {
+          renderStatus(data);
+        }).catch(function (err) {
+        });
+      }
+
+      WebUI.initPage('dashboard', 'webui.dashboard.title', '仪表盘').then(function () {
+        fetchStatus();
+        pollTimer = setInterval(fetchStatus, 3000);
+
+        // 刷新缩略图按钮
+        var refreshBtn = document.getElementById('refreshThumbBtn');
+        if (refreshBtn) {
+          refreshBtn.addEventListener('click', function () {
+            var mapThumb = document.getElementById('mapThumb');
+            if (mapThumb) {
+              mapThumb.src = '/api/world/snapshot?t=' + Date.now();
+            }
+          });
+        }
+
+        // 缩略图定时自动刷新（每 30 秒）
+        setInterval(function () {
+          var mapThumb = document.getElementById('mapThumb');
+          if (mapThumb && mapThumb.dataset.loaded && mapThumb.style.display !== 'none') {
+            mapThumb.src = '/api/world/snapshot?t=' + Date.now();
+          }
+        }, 30000);
+
+        // 每日一言
+        function loadDailyQuote() {
+          var el = document.getElementById('dailyQuote');
+          if (el) el.textContent = WebUI.t('webui.dashboard.loading', '加载中...');
+          WebUI.apiGet('/api/daily-quote').then(function (data) {
+            if (el) el.textContent = data.text;
+          }).catch(function (e) {
+            if (el) el.textContent = WebUI.t('webui.dashboard.fetchFailed', '获取失败: ') + e.message;
+          });
+        }
+
+        var refreshQuoteBtn = document.getElementById('refreshQuoteBtn');
+        if (refreshQuoteBtn) refreshQuoteBtn.addEventListener('click', loadDailyQuote);
+
+        var copyQuoteBtn = document.getElementById('copyQuoteBtn');
+        if (copyQuoteBtn) copyQuoteBtn.addEventListener('click', function () {
+          var text = document.getElementById('dailyQuote').textContent;
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(text).then(function () {
+              WebUI.toast(WebUI.t('webui.dashboard.copySuccess', '已复制到剪贴板'), 'success');
+            }).catch(function () {
+              WebUI.toast(WebUI.t('webui.dashboard.copyFailed', '复制失败'), 'error');
+            });
+          } else {
+            // Fallback
+            var ta = document.createElement('textarea');
+            ta.value = text;
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); WebUI.toast(WebUI.t('webui.dashboard.copySuccess', '已复制到剪贴板'), 'success'); }
+            catch (e) { WebUI.toast(WebUI.t('webui.dashboard.copyFailed', '复制失败'), 'error'); }
+            document.body.removeChild(ta);
+          }
+        });
+
+        // 初始加载
+        loadDailyQuote();
+
+      });
+
+      // 缩略图点击预览大图（支持滚轮缩放 + 拖拽移动）
+      var thumbModal = document.getElementById('thumbModal');
+      var thumbModalImg = document.getElementById('thumbModalImg');
+      var mapThumbEl = document.getElementById('mapThumb');
+      if (mapThumbEl && thumbModal && thumbModalImg) {
+        var zoomLevel = 1;
+        var panX = 0, panY = 0;
+        var dragging = false;
+        var dragStartX = 0, dragStartY = 0;
+        var panStartX = 0, panStartY = 0;
+
+        function updateTransform() {
+          thumbModalImg.style.transform = 'translate(' + panX + 'px,' + panY + 'px) scale(' + zoomLevel + ')';
+        }
+        function openModal(src) {
+          thumbModalImg.src = src;
+          zoomLevel = 1;
+          panX = 0; panY = 0;
+          updateTransform();
+          thumbModal.style.display = 'flex';
+        }
+        function closeModal() {
+          thumbModal.style.display = 'none';
+        }
+
+        // 点击缩略图打开大图
+        mapThumbEl.addEventListener('click', function (e) {
+          e.stopPropagation();
+          openModal(mapThumbEl.src);
+        });
+        // 只有点击背景才关闭（点击图片不关闭，方便查看）
+        thumbModal.addEventListener('click', function (e) {
+          if (e.target === thumbModal) {
+            closeModal();
+          }
+        });
+        // 滚轮缩放
+        thumbModal.addEventListener('wheel', function (e) {
+          e.preventDefault();
+          if (e.deltaY < 0) {
+            zoomLevel = Math.min(zoomLevel + 0.15, 5);
+          } else {
+            zoomLevel = Math.max(zoomLevel - 0.15, 0.3);
+          }
+          updateTransform();
+        }, { passive: false });
+        // 拖拽移动（鼠标按住图片拖动）
+        thumbModalImg.addEventListener('mousedown', function (e) {
+          e.preventDefault();
+          dragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          panStartX = panX;
+          panStartY = panY;
+          thumbModalImg.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mousemove', function (e) {
+          if (!dragging) return;
+          panX = panStartX + (e.clientX - dragStartX);
+          panY = panStartY + (e.clientY - dragStartY);
+          updateTransform();
+        });
+        document.addEventListener('mouseup', function () {
+          if (dragging) {
+            dragging = false;
+            thumbModalImg.style.cursor = 'grab';
+          }
+        });
+        // ESC 键关闭
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape' && thumbModal.style.display !== 'none') {
+            closeModal();
+          }
+        });
+      }
+
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+          if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        } else if (!pollTimer) {
+          fetchStatus();
+          pollTimer = setInterval(fetchStatus, 3000);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

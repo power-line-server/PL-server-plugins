@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.login.title">Mindustry WebUI 登录</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    html.dark body {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 100%);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--card-bg);
+      backdrop-filter: var(--glass-blur);
+      border-radius: var(--webui-card-radius);
+      box-shadow: var(--webui-card-shadow);
+      border: 1px solid var(--card-border);
+      padding: 2.25rem 2rem;
+    }
+    .login-brand {
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .login-brand .logo {
+      font-size: 2.5rem;
+      line-height: 1;
+    }
+    .login-brand h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0.5rem 0 0;
+      color: var(--text);
+    }
+    .login-brand .sub {
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    .form-label { font-size: 0.9rem; font-weight: 500; color: var(--text); }
+    .btn-primary {
+      background: var(--webui-primary);
+      border-color: var(--webui-primary);
+      width: 100%;
+      padding: 0.6rem;
+      font-weight: 500;
+    }
+    .alert { margin-bottom: 0; font-size: 0.875rem; }
+    .login-foot { text-align: center; color: var(--text-muted); font-size: 0.75rem; margin-top: 1.5rem; }
+  </style>
+</head>
+<body>
+  <main class="login-card">
+    <div class="login-brand">
+      <div class="logo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/>
+          <line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/>
+          <path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.152A4 4 0 0 0 17.32 5z"/>
+        </svg>
+      </div>
+      <h1 data-i18n="webui.login.brand">Mindustry WebUI</h1>
+      <div class="sub" data-i18n="webui.login.subtitle">服务器管理控制台</div>
+    </div>
+
+    <div id="loginAlert" class="alert alert-danger d-none" role="alert"></div>
+
+    <form id="loginForm" autocomplete="off">
+      <div class="mb-3">
+        <label for="usernameInput" class="form-label" data-i18n="webui.login.usernameLabel">用户名</label>
+        <input type="text" class="form-control form-control-lg" id="usernameInput"
+               placeholder="请输入用户名" required autocomplete="username"
+               data-i18n-placeholder="webui.login.usernamePlaceholder">
+      </div>
+      <div class="mb-3">
+        <label for="passwordInput" class="form-label" data-i18n="webui.login.passwordLabel">密码</label>
+        <input type="password" class="form-control form-control-lg" id="passwordInput"
+               placeholder="请输入密码" required autocomplete="current-password"
+               data-i18n-placeholder="webui.login.passwordPlaceholder">
+      </div>
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary btn-lg" id="loginBtn"
+                data-i18n="webui.login.submit">登录</button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="guestBtn"
+                data-i18n="webui.login.guestBrowse">以游客身份浏览</button>
+      </div>
+    </form>
+
+    <div class="login-foot" data-i18n="webui.login.footer">Mindustry Server · 管理面板</div>
+  </main>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var form = document.getElementById('loginForm');
+      var alertBox = document.getElementById('loginAlert');
+      var btn = document.getElementById('loginBtn');
+
+      function showError(msg) {
+        alertBox.textContent = msg;
+        alertBox.classList.remove('d-none');
+      }
+      function hideError() { alertBox.classList.add('d-none'); }
+
+      function showForm() {
+        WebUI.loadI18n(WebUI.getLang());
+        document.body.style.visibility = '';
+      }
+
+      // 已登录时异步验证 session 有效性，防止 cookie 无效时无限循环
+      if (WebUI.isLoggedIn()) {
+        document.body.style.visibility = 'hidden';
+        WebUI.apiGet('/api/status').then(function () {
+          location.replace('dashboard.html');
+        }).catch(function () {
+          // token 已被 request() 清除，显示登录表单
+          showForm();
+        });
+      } else {
+        showForm();
+      }
+
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        hideError();
+        var username = document.getElementById('usernameInput').value.trim();
+        var password = document.getElementById('passwordInput').value;
+        if (!username) {
+          showError(WebUI.t('webui.login.usernameRequired', '请输入用户名'));
+          return;
+        }
+        if (!password) {
+          showError(WebUI.t('webui.login.passwordRequired', '请输入密码'));
+          return;
+        }
+        btn.disabled = true;
+        var btnText = btn.textContent;
+        btn.textContent = WebUI.t('webui.login.loggingIn', '登录中...');
+
+        // 直接用 fetch 绕过 401 跳转逻辑
+        fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ username: username, password: password })
+        }).then(function (resp) {
+          return resp.json().then(function (data) {
+            return { status: resp.status, body: data };
+          });
+        }).then(function (r) {
+          if (r.status === 200 && r.body && (r.body.code === 0 || r.body.code === 200)) {
+            var data = r.body.data || {};
+            var sessionToken = data.sessionToken || data.token;
+            if (!sessionToken) {
+              showError(WebUI.t('webui.login.noSession', '服务器未返回会话凭证'));
+              btn.disabled = false;
+              btn.textContent = btnText;
+              return;
+            }
+            WebUI.setToken(sessionToken);
+            location.href = 'dashboard.html';
+          } else {
+            showError((r.body && r.body.msg) || WebUI.t('webui.login.failed', '登录失败，请检查用户名或密码'));
+            btn.disabled = false;
+            btn.textContent = btnText;
+          }
+        }).catch(function (err) {
+          showError(WebUI.t('webui.login.networkError', '网络错误，请重试'));
+          btn.disabled = false;
+          btn.textContent = btnText;
+        });
+      });
+
+      // 游客入口: 游客模式启用时显示按钮, 点击无需登录直接浏览(后端自动降级为游客身份)
+      fetch('/api/auth/guest-status', {
+        headers: { 'Accept': 'application/json' }
+      }).then(function (resp) { return resp.json(); }).then(function (r) {
+        var enabled = r && r.code === 0 && r.data && r.data.enabled;
+        if (enabled) {
+          var guestBtn = document.getElementById('guestBtn');
+          guestBtn.classList.remove('d-none');
+          guestBtn.addEventListener('click', function () {
+            location.href = 'dashboard.html';
+          });
+        }
+      }).catch(function () { /* 游客状态查询失败则隐藏入口 */ });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+@file:Depends("wayzer/maps")
+
+package wayzer.map
+
+import arc.files.Fi
+import arc.util.Strings
+import arc.util.serialization.JsonReader
+import arc.util.serialization.JsonValue
+import com.google.common.cache.CacheBuilder
+import mindustry.game.Gamemode
+import mindustry.io.MapIO
+import wayzer.MapInfo
+import wayzer.MapProvider
+import wayzer.MapRegistry
+import java.io.ByteArrayInputStream
+import java.io.InputStream
+import java.net.URL
+import java.net.URLEncoder
+import java.time.Duration
+import java.util.logging.Level
+
+val webRoot by config.key("https://api.mindustry.top", "Mindustry资源站Api")
+
+fun parseJson(json: String): JsonValue {
+    return JsonReader().parse(json)
+}
+
+fun JsonValue.toStringMap(): Map<String, String> {
+    check(isObject)
+    val map = mutableMapOf<String, String>()
+    forEach {
+        if (it.isString) {
+            map[it.name()] = it.asString()
+        }
+    }
+    return map
+}
+
+suspend fun httpGet(url: String, retry: Int = 3) = withContext(Dispatchers.IO) {
+    var result: Result<ByteArray> = Result.failure(IllegalStateException("result not set"))
+    repeat(retry + 1) {
+        result = kotlin.runCatching {
+            val conn = URL(url).openConnection()
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 10_000
+            val stream = conn.getInputStream()
+            stream.use { runInterruptible { stream.readBytes() } }
+        }.onSuccess { return@withContext it }
+        delay(1000)
+    }
+    result.getOrThrow()
+}
+
+
+MapRegistry.register(this, object : MapProvider() {
+    val searchCache = CacheBuilder.newBuilder()
+        .expireAfterWrite(Duration.ofHours(1))
+        .build<String, List<MapInfo>>()!!
+
+    override fun toString(): String = "ResourceSite"
+
+    override suspend fun searchMaps(search: String?): Collection<MapInfo> {
+        val provider = this
+        val mappedSearch = when (search) {
+            "all", "display", "site", null -> ""
+            "pvp", "attack", "survive" -> "@mode:${Strings.capitalize(search)}"
+            else -> search
+        }
+        searchCache.getIfPresent(mappedSearch)?.let { return it }
+        try {
+            @Suppress("BlockingMethodInNonBlockingContext")
+            val maps =
+                httpGet("$webRoot/maps/list?prePage=100&search=${URLEncoder.encode(mappedSearch, "utf-8")}", retry = 1)
+                    .let { parseJson(it.toString(Charsets.UTF_8)) }
+                    .map { info ->
+                        val id = info.getInt("id", -1)
+                        val mode = info.getString("mode", "unknown")
+                        MapInfo(
+                            provider, id,
+                            Gamemode.all.find { it.name.equals(mode, ignoreCase = true) } ?: Gamemode.survival,
+                            meta = info.toStringMap().apply {
+                                (this as MutableMap).put("description", remove("desc").orEmpty())
+                            }
+                        )
+                    }
+            searchCache.put(mappedSearch, maps)
+            return maps
+        } catch (e: Exception) {
+            logger.log(Level.WARNING, "Fail to searchMap($search)", e)
+            return emptyList()
+        }
+    }
+
+    override suspend fun findById(id: Int, reply: ((VarString) -> Unit)?): MapInfo? {
+        if (id !in 10000..99999) return null
+        try {
+            val info = httpGet("$webRoot/maps/$id.json")
+                .let { parseJson(it.toString(Charsets.UTF_8)) }
+            val mode = info.getString("mode", "unknown")
+            return MapInfo(
+                this, id,
+                Gamemode.all.find { it.name.equals(mode, ignoreCase = true) } ?: Gamemode.survival,
+                meta = info.get("tags").toStringMap(),
+            )
+        } catch (e: Exception) {
+            logger.log(Level.WARNING, "Fail to findById($id)", e)
+            return null
+        }
+    }
+
+    override suspend fun lazyGetMap(info: MapInfo): mindustry.maps.Map {
+        val bs = httpGet("$webRoot/maps/${info.id}.msav", retry = 3)
+        val fi = object : Fi("BYTES.msav") {
+            override fun read(): InputStream {
+                return ByteArrayInputStream(bs)
+            }
+        }
+        return MapIO.createMap(fi, true)
+    }
+})

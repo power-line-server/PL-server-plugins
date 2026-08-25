@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mindustry WebUI</title>
+</head>
+<body>
+  <script>
+    (function () {
+      var token = sessionStorage.getItem('webui_session_token');
+      if (token) {
+        location.replace('dashboard.html');
+      } else {
+        location.replace('login.html');
+      }
+    })();
+  </script>
+</body>
+</html>

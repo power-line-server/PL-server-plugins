@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.users.title">用户管理 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+<style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 1.1rem; line-height: 1; }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; }
+    .webui-card { background: var(--card-bg); backdrop-filter: var(--glass-blur); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); }
+    .table { margin-bottom: 0; }
+    .table thead th { background: var(--table-head-bg); font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
+    .table td { font-size: 0.9rem; vertical-align: middle; color: var(--text); }
+    .table-wrap { overflow-x: auto; }
+    .empty-row td { text-align: center; color: var(--text-muted); padding: 2rem; }
+    .player-name { font-weight: 600; color: var(--text); }
+    .uuid-cell { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.78rem; color: var(--text-muted); }
+    .nav-tabs .nav-link { color: var(--text-muted); font-weight: 500; }
+    .nav-tabs .nav-link.active { color: var(--webui-primary); font-weight: 600; }
+    .refresh-bar { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.75rem; }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <aside id="appSidebar" class="app-sidebar"></aside>
+    <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileSidebar">
+      <div class="offcanvas-body p-0" id="appOffcanvasBody"></div>
+    </div>
+    <main class="app-main">
+      <div id="appTopbar" class="app-topbar"></div>
+      <div class="app-content">
+        <div class="webui-card p-4 mb-3">
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <h4 class="mb-1" data-i18n="webui.users.guestTitle">游客模式</h4>
+              <div class="text-muted small" data-i18n="webui.users.guestDesc">启用后无需登录即可查看仪表盘（仅服务器状态）</div>
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input" type="checkbox" id="guestSwitch">
+              <label class="form-check-label" for="guestSwitch" data-i18n="webui.users.guestSwitch">启用</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="webui-card p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+            <h4 class="mb-0" data-i18n="webui.users.listTitle">用户列表</h4>
+            <div class="d-flex gap-2">
+              <button class="btn btn-sm btn-outline-secondary" id="refreshUsers" data-i18n="webui.common.refresh">刷新</button>
+              <button class="btn btn-sm btn-primary" id="addUserBtn" data-i18n="webui.users.addUser">新建用户</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th data-i18n="webui.users.col.username">用户名</th>
+                  <th data-i18n="webui.users.col.role">角色</th>
+                  <th data-i18n="webui.users.col.status">状态</th>
+                  <th data-i18n="webui.users.col.perms">权限数</th>
+                  <th data-i18n="webui.players.table.actions">操作</th>
+                </tr>
+              </thead>
+              <tbody id="usersBody">
+                <tr class="empty-row"><td colspan="5" data-i18n="webui.users.loading">加载中...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="modal fade" id="userModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="userModalTitle" data-i18n="webui.users.editTitle">用户设置</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="webui.login.usernameLabel">用户名</label>
+              <input type="text" class="form-control" id="userName" disabled>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" data-i18n="webui.users.col.password">密码（留空不修改）</label>
+              <input type="password" class="form-control" id="userPassword" autocomplete="new-password">
+            </div>
+          </div>
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="userDisabled">
+            <label class="form-check-label" for="userDisabled" data-i18n="webui.users.col.disabled">禁用此用户</label>
+          </div>
+          <label class="form-label" data-i18n="webui.users.permTitle">权限节点</label>
+          <div class="perm-grid" id="permGrid"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="webui.common.cancel">取消</button>
+          <button type="button" class="btn btn-primary" id="userSave" data-i18n="webui.users.save">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+  (function () {
+    var PERM_NODES = [];
+    var USER_LIST = [];
+    var editingName = null;
+
+    function t(key, fallback) { return WebUI.t(key, fallback); }
+
+    function loadAll() {
+      return Promise.all([
+        WebUI.apiGet('/api/users'),
+        WebUI.apiGet('/api/users/perm-nodes')
+      ]).then(function (res) {
+        var data = res[0];
+        PERM_NODES = res[1] || [];
+        USER_LIST = data.users || [];
+        renderGuestSwitch(data);
+        renderUsers();
+      });
+    }
+
+    function renderGuestSwitch(data) {
+      var sw = document.getElementById('guestSwitch');
+      sw.checked = !!data.guestEnabled;
+      sw.onchange = function () {
+        WebUI.apiPut('/api/users/guest', { disabled: !sw.checked }).then(function () {
+          WebUI.toast(t('webui.users.guestUpdated', '游客模式已更新'), 'success');
+          loadAll(); // 刷新列表, 同步游客行状态
+        }).catch(function (e) { WebUI.toast(e.message, 'error'); loadAll(); });
+      };
+    }
+
+    function renderUsers() {
+      var body = document.getElementById('usersBody');
+      if (!USER_LIST.length) {
+        body.innerHTML = '<tr class="empty-row"><td colspan="5">' + t('webui.users.empty', '暂无用户') + '</td></tr>';
+        return;
+      }
+      body.innerHTML = USER_LIST.map(function (u) {
+        var roleText = u.role === 1 ? t('webui.users.roleGuest', '游客')
+          : (u.role === 0 ? t('webui.users.roleUser', '普通用户') : t('webui.users.roleAdmin', '管理员'));
+        var status = u.disabled
+          ? '<span class="badge bg-secondary">' + t('webui.users.disabled', '已禁用') + '</span>'
+          : '<span class="badge bg-success">' + t('webui.users.enabled', '正常') + '</span>';
+        // 游客由顶部"游客模式"开关统一控制, 行内无操作; 管理员为虚拟用户不显示
+        var actions = u.role === 1 ? ''
+          : '<button class="btn btn-sm btn-outline-primary act-edit" data-name="' + u.username + '">' + t('webui.users.edit', '编辑') + '</button> ' +
+            '<button class="btn btn-sm btn-outline-danger act-del" data-name="' + u.username + '">' + t('webui.users.delete', '删除') + '</button>';
+        return '<tr><td>' + WebUI.escapeHtml(u.username) + '</td><td>' + roleText + '</td><td>' + status + '</td><td>' + (u.permissions || []).length + '</td><td>' + actions + '</td></tr>';
+      }).join('');
+      bindTableActions();
+    }
+
+    function bindTableActions() {
+      document.querySelectorAll('.act-edit').forEach(function (btn) {
+        btn.addEventListener('click', function () { openEdit(btn.getAttribute('data-name')); });
+      });
+      document.querySelectorAll('.act-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var name = btn.getAttribute('data-name');
+          if (!confirm(t('webui.users.confirmDelete', '确定删除用户') + ' ' + name + ' ?')) return;
+          WebUI.apiDelete('/api/users/' + encodeURIComponent(name)).then(function () {
+            WebUI.toast(t('webui.users.deleted', '已删除'), 'success');
+            loadAll();
+          }).catch(function (e) { WebUI.toast(e.message, 'error'); });
+        });
+      });
+    }
+
+    function openEdit(name) {
+      var u = null;
+      for (var i = 0; i < USER_LIST.length; i++) if (USER_LIST[i].username === name) { u = USER_LIST[i]; break; }
+      if (!u) return;
+      editingName = name;
+      document.getElementById('userModalTitle').textContent = t('webui.users.editTitle', '用户设置') + ': ' + name;
+      document.getElementById('userName').value = name;
+      document.getElementById('userName').disabled = true;
+      document.getElementById('userPassword').value = '';
+      document.getElementById('userDisabled').checked = !!u.disabled;
+      renderPermGrid(u.permissions || []);
+      new bootstrap.Modal(document.getElementById('userModal')).show();
+    }
+
+    function openCreate() {
+      editingName = null;
+      document.getElementById('userModalTitle').textContent = t('webui.users.addUser', '新建用户');
+      document.getElementById('userName').value = '';
+      document.getElementById('userName').disabled = false;
+      document.getElementById('userPassword').value = '';
+      document.getElementById('userDisabled').checked = false;
+      renderPermGrid([]);
+      new bootstrap.Modal(document.getElementById('userModal')).show();
+    }
+
+    function renderPermGrid(selected) {
+      var grid = document.getElementById('permGrid');
+      grid.innerHTML = PERM_NODES.map(function (p) {
+        var checked = selected.indexOf(p.node) >= 0 ? ' checked' : '';
+        return '<label class="perm-item"><input type="checkbox" class="perm-check" value="' + p.node + '"' + checked + '> ' +
+          t(p.key, p.node) + '</label>';
+      }).join('');
+    }
+
+    document.getElementById('addUserBtn').addEventListener('click', openCreate);
+    document.getElementById('userSave').addEventListener('click', function () {
+      var name = document.getElementById('userName').value.trim();
+      var pwd = document.getElementById('userPassword').value;
+      var disabled = document.getElementById('userDisabled').checked;
+      var perms = [];
+      document.querySelectorAll('.perm-check:checked').forEach(function (c) { perms.push(c.value); });
+      var body = { permissions: perms, disabled: disabled };
+      if (pwd) body.password = pwd;
+      var req;
+      if (editingName === null) {
+        if (!name || !pwd || pwd.length < 6) {
+          WebUI.toast(t('webui.users.needNamePwd', '用户名必填且密码至少6位'), 'error');
+          return;
+        }
+        body.username = name;
+        req = WebUI.apiPost('/api/users', body);
+      } else {
+        req = WebUI.apiPut('/api/users/' + encodeURIComponent(editingName), body);
+      }
+      req.then(function () {
+        WebUI.toast(t('webui.users.saved', '已保存'), 'success');
+        bootstrap.Modal.getInstance(document.getElementById('userModal')).hide();
+        loadAll();
+      }).catch(function (e) { WebUI.toast(e.message, 'error'); });
+    });
+    document.getElementById('refreshUsers').addEventListener('click', loadAll);
+
+    WebUI.initPage('users', 'webui.users.title', '用户管理').then(function () {
+      loadAll();
+    });
+  })();
+  </script>
+  <style>
+  .perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+  .perm-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border, #e3e6ea); border-radius: 6px; font-size: 0.875rem; cursor: pointer; }
+  </style>
+</body>
+</html>

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.maps.title">地图存档 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      /* 浅色模式 */
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --table-head-bg: rgba(248, 249, 250, 0.8);
+      --modal-bg: rgba(255, 255, 255, 0.95);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --table-head-bg: rgba(30, 33, 45, 0.8);
+      --modal-bg: rgba(30, 33, 45, 0.95);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    /* 动效 */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    /* 卡片悬停动效 */
+    .webui-card {
+      transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    .webui-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    html.dark .webui-card:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    }
+    /* 侧边栏菜单项动效 */
+    .sidebar-nav .nav-link {
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .sidebar-nav .nav-link:hover,
+    .sidebar-nav .nav-link.active {
+      transform: translateX(4px);
+    }
+    /* 主题切换过渡 */
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content {
+      transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg {
+      background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important;
+      position: relative;
+    }
+    .has-gradient-bg::before {
+      content: '';
+      position: fixed;
+      top: -10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%);
+      filter: blur(80px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    .has-gradient-bg::after {
+      content: '';
+      position: fixed;
+      bottom: -10%;
+      right: -10%;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%);
+      filter: blur(90px);
+      z-index: -1;
+      pointer-events: none;
+    }
+    html.dark .has-gradient-bg {
+      background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important;
+    }
+    html.dark .has-gradient-bg::before {
+      background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%);
+    }
+    html.dark .has-gradient-bg::after {
+      background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); backdrop-filter: var(--glass-blur); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .nav-icon { font-size: 1.1rem; line-height: 1; }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; }
+    .webui-card { background: var(--card-bg); backdrop-filter: var(--glass-blur); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); }
+    .table { margin-bottom: 0; }
+    .table thead th { background: var(--table-head-bg); font-size: 0.8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid var(--border); }
+    .table td { font-size: 0.9rem; vertical-align: middle; color: var(--text); }
+    .table-wrap { overflow-x: auto; }
+    .empty-row td { text-align: center; color: var(--text-muted); padding: 2rem; }
+    .nav-tabs .nav-link { color: var(--text-muted); font-weight: 500; }
+    .nav-tabs .nav-link.active { color: var(--webui-primary); font-weight: 600; }
+    .current-map-bar { background: #e7f1ff; border: 1px solid #b6d4fe; border-radius: var(--webui-card-radius); padding: 0.75rem 1rem; margin-bottom: 1rem; font-size: 0.9rem; color: var(--text); }
+    .current-map-bar strong { color: var(--webui-primary); }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+  </style>
+</head>
+<body>
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <div class="current-map-bar">
+        <span data-i18n="webui.maps.currentLabel">当前地图：</span>
+        <strong id="currentMapName">-</strong>
+      </div>
+
+      <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#pane-maps" type="button" role="tab" data-i18n="webui.maps.tab.maps">地图列表</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pane-saves" type="button" role="tab" data-i18n="webui.maps.tab.saves">存档列表</button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <!-- 地图列表 -->
+        <div class="tab-pane fade show active" id="pane-maps" role="tabpanel">
+          <div class="webui-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div><span data-i18n="webui.maps.count">地图数量：</span><span id="mapCount">0</span></div>
+              <button class="btn btn-sm btn-outline-secondary" id="refreshMaps" data-i18n="webui.common.refresh">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th data-i18n="webui.maps.table.name">名称</th>
+                    <th data-i18n="webui.maps.table.author">作者</th>
+                    <th data-i18n="webui.maps.table.size">尺寸</th>
+                    <th data-i18n="webui.maps.table.actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="mapsBody">
+                  <tr class="empty-row"><td colspan="4" data-i18n="webui.maps.loading">加载中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 存档列表 -->
+        <div class="tab-pane fade" id="pane-saves" role="tabpanel">
+          <div class="webui-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div><span data-i18n="webui.saves.count">存档数量：</span><span id="saveCount">0</span></div>
+              <button class="btn btn-sm btn-outline-secondary" id="refreshSaves" data-i18n="webui.common.refresh">刷新</button>
+            </div>
+            <div class="table-wrap">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th data-i18n="webui.saves.table.name">名称</th>
+                    <th data-i18n="webui.maps.table.actions">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="savesBody">
+                  <tr class="empty-row"><td colspan="2" data-i18n="webui.saves.loading">加载中...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 通用确认模态框 -->
+  <div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="confirmTitle" data-i18n="webui.common.confirm">确认操作</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body" id="confirmBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="webui.common.cancel">取消</button>
+          <button type="button" class="btn btn-primary" id="confirmOk" data-i18n="webui.common.confirm">确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var confirmModal = null;
+      var pendingAction = null;
+
+      function showConfirm(titleKey, titleText, bodyHtml, okClass, action) {
+        document.getElementById('confirmTitle').textContent = WebUI.t(titleKey, titleText);
+        document.getElementById('confirmBody').innerHTML = bodyHtml;
+        var ok = document.getElementById('confirmOk');
+        ok.className = 'btn ' + (okClass || 'btn-primary');
+        ok.textContent = WebUI.t('webui.common.confirm', '确认');
+        pendingAction = action;
+        confirmModal.show();
+      }
+
+      function renderMaps(list) {
+        var body = document.getElementById('mapsBody');
+        document.getElementById('mapCount').textContent = (list && list.length) || 0;
+        if (!list || !list.length) {
+          body.innerHTML = '<tr class="empty-row"><td colspan="4">' + WebUI.t('webui.maps.empty', '暂无地图') + '</td></tr>';
+          return;
+        }
+        body.innerHTML = list.map(function (m) {
+          var name = WebUI.escapeHtml(m.name || '-');
+          var size = (m.width && m.height) ? (m.width + ' × ' + m.height) : '-';
+          return '<tr>' +
+            '<td class="fw-semibold">' + name + '</td>' +
+            '<td>' + WebUI.escapeHtml(m.author || '-') + '</td>' +
+            '<td>' + size + '</td>' +
+            '<td><button class="btn btn-sm btn-primary" onclick="WebUIpage.switchMap(\'' + name + '\')">' + WebUI.t('webui.maps.action.switch', '切换') + '</button></td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      function renderSaves(list) {
+        var body = document.getElementById('savesBody');
+        document.getElementById('saveCount').textContent = (list && list.length) || 0;
+        if (!list || !list.length) {
+          body.innerHTML = '<tr class="empty-row"><td colspan="2">' + WebUI.t('webui.saves.empty', '暂无存档') + '</td></tr>';
+          return;
+        }
+        body.innerHTML = list.map(function (s) {
+          var name = typeof s === 'string' ? s : (s.name || s);
+          var enc = WebUI.escapeHtml(name);
+          return '<tr>' +
+            '<td class="fw-semibold">' + enc + '</td>' +
+            '<td>' +
+              '<button class="btn btn-sm btn-success me-1" onclick="WebUIpage.loadSave(\'' + enc + '\')">' + WebUI.t('webui.saves.action.load', '加载') + '</button>' +
+              '<button class="btn btn-sm btn-danger" onclick="WebUIpage.deleteSave(\'' + enc + '\')">' + WebUI.t('webui.saves.action.delete', '删除') + '</button>' +
+            '</td>' +
+          '</tr>';
+        }).join('');
+      }
+
+      function fetchMaps() {
+        WebUI.apiGet('/api/maps').then(renderMaps).catch(function () {
+          document.getElementById('mapsBody').innerHTML = '<tr class="empty-row"><td colspan="4">' + WebUI.t('webui.common.loadFailed', '加载失败') + '</td></tr>';
+        });
+      }
+      function fetchSaves() {
+        WebUI.apiGet('/api/saves').then(renderSaves).catch(function () {
+          document.getElementById('savesBody').innerHTML = '<tr class="empty-row"><td colspan="2">' + WebUI.t('webui.common.loadFailed', '加载失败') + '</td></tr>';
+        });
+      }
+      function fetchCurrent() {
+        WebUI.apiGet('/api/maps/current').then(function (data) {
+          var name = (data && (data.name || data.mapName)) || (typeof data === 'string' ? data : '-');
+          document.getElementById('currentMapName').textContent = name;
+        }).catch(function () {});
+      }
+
+      window.WebUIpage = {
+        switchMap: function (name) {
+          var body = WebUI.t('webui.maps.confirmSwitch', '确认切换到地图：') + '<br><strong>' + WebUI.escapeHtml(name) + '</strong>';
+          showConfirm('webui.maps.confirmSwitchTitle', '切换地图', body, 'btn-primary', function () {
+            return WebUI.apiPut('/api/maps/' + encodeURIComponent(name)).then(function () {
+              WebUI.toast(WebUI.t('webui.maps.switched', '已切换地图'), 'success');
+              fetchCurrent();
+            });
+          });
+        },
+        loadSave: function (name) {
+          var body = WebUI.t('webui.saves.confirmLoad', '确认加载存档：') + '<br><strong>' + WebUI.escapeHtml(name) + '</strong>';
+          showConfirm('webui.saves.confirmLoadTitle', '加载存档', body, 'btn-success', function () {
+            return WebUI.apiPut('/api/saves/' + encodeURIComponent(name)).then(function () {
+              WebUI.toast(WebUI.t('webui.saves.loaded', '存档已加载'), 'success');
+              fetchCurrent();
+            });
+          });
+        },
+        deleteSave: function (name) {
+          var body = WebUI.t('webui.saves.confirmDelete', '确认删除存档：') + '<br><strong>' + WebUI.escapeHtml(name) + '</strong>';
+          showConfirm('webui.saves.confirmDeleteTitle', '删除存档', body, 'btn-danger', function () {
+            return WebUI.apiDelete('/api/saves/' + encodeURIComponent(name)).then(function () {
+              WebUI.toast(WebUI.t('webui.saves.deleted', '存档已删除'), 'success');
+              fetchSaves();
+            });
+          });
+        }
+      };
+
+      WebUI.initPage('maps', 'webui.maps.title', '地图存档').then(function () {
+        confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        fetchCurrent();
+        fetchMaps();
+        fetchSaves();
+
+        document.getElementById('refreshMaps').addEventListener('click', fetchMaps);
+        document.getElementById('refreshSaves').addEventListener('click', fetchSaves);
+
+        document.getElementById('confirmOk').addEventListener('click', function () {
+          if (!pendingAction) return;
+          var btn = document.getElementById('confirmOk');
+          btn.disabled = true;
+          pendingAction().then(function () {
+            confirmModal.hide();
+          }).catch(function (e) {
+            WebUI.toast(e.message || WebUI.t('webui.common.opFailed', '操作失败'), 'error');
+          }).finally(function () {
+            btn.disabled = false;
+            pendingAction = null;
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title data-i18n="webui.settings.title">设置 - Mindustry WebUI</title>
+  <link rel="stylesheet" href="assets/bootstrap.min.css">
+  <style>
+    :root {
+      --webui-primary: #0d6efd;
+      --webui-card-radius: 0.75rem;
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --webui-sidebar-w: 220px;
+      --bg: #f0f2f5;
+      --sidebar-bg: rgba(30, 33, 40, 0.85);
+      --sidebar-text: #cdd2d8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(255, 255, 255, 0.72);
+      --card-border: rgba(255, 255, 255, 0.5);
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+      --border: #e3e6ea;
+      --topbar-bg: rgba(255, 255, 255, 0.75);
+      --input-bg: rgba(255, 255, 255, 0.9);
+      --glass-blur: blur(12px) saturate(150%);
+    }
+    html.dark {
+      --bg: #1a1b26;
+      --sidebar-bg: rgba(20, 22, 30, 0.85);
+      --sidebar-text: #a0a8b8;
+      --sidebar-text-hover: #ffffff;
+      --card-bg: rgba(35, 38, 50, 0.72);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #e0e0e8;
+      --text-muted: #8b92a5;
+      --border: #2a2d3a;
+      --topbar-bg: rgba(30, 33, 45, 0.75);
+      --input-bg: rgba(30, 33, 45, 0.9);
+      --webui-card-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    .app-sidebar { position: fixed; top: 0; left: 0; bottom: 0; width: var(--webui-sidebar-w); background: var(--sidebar-bg); color: var(--sidebar-text); display: flex; flex-direction: column; z-index: 1030; backdrop-filter: var(--glass-blur); }
+    .sidebar-brand { padding: 1rem 1.25rem; font-size: 1.1rem; font-weight: 600; color: var(--sidebar-text-hover); border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-nav { flex: 1; padding: 0.5rem 0; overflow-y: auto; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { display: flex; align-items: center; gap: 0.6rem; padding: 0.65rem 1.25rem; color: var(--sidebar-text); text-decoration: none; border: none; border-radius: 0; background: transparent; width: 100%; text-align: left; font-size: 0.95rem; cursor: pointer; }
+    .sidebar-nav .nav-link, .sidebar-footer .nav-link { transition: transform 0.2s ease, background 0.2s ease; }
+    .sidebar-nav .nav-link:hover, .sidebar-footer .nav-link:hover { background: rgba(255,255,255,0.08); color: var(--sidebar-text-hover); transform: translateX(4px); }
+    .sidebar-nav .nav-link.active { background: var(--webui-primary); color: #fff; transform: translateX(4px); }
+    .sidebar-footer { padding: 0.5rem 0; border-top: 1px solid rgba(255,255,255,0.1); }
+    .app-main { margin-left: var(--webui-sidebar-w); min-height: 100vh; display: flex; flex-direction: column; }
+    .app-topbar { position: sticky; top: 0; z-index: 1020; display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 1rem; background: var(--topbar-bg); border-bottom: 1px solid var(--border); backdrop-filter: var(--glass-blur); }
+    .topbar-title { font-size: 1.15rem; font-weight: 600; margin: 0; flex: 1; color: var(--text); }
+    .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+    .app-content { padding: 1.25rem; flex: 1; animation: fadeInUp 0.3s ease-out; }
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .webui-card { background: var(--card-bg); border-radius: var(--webui-card-radius); box-shadow: var(--webui-card-shadow); border: 1px solid var(--card-border); backdrop-filter: var(--glass-blur); transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+    .webui-card:hover { transform: translateY(-2px); }
+    /* 渐变光斑默认背景 */
+    .has-gradient-bg { background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 50%, #e9ecef 100%) !important; position: relative; }
+    .has-gradient-bg::before { content: ''; position: fixed; top: -10%; left: -10%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(circle, rgba(13, 110, 253, 0.15) 0%, transparent 70%); filter: blur(80px); z-index: -1; pointer-events: none; }
+    .has-gradient-bg::after { content: ''; position: fixed; bottom: -10%; right: -10%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(circle, rgba(220, 53, 69, 0.1) 0%, transparent 70%); filter: blur(90px); z-index: -1; pointer-events: none; }
+    html.dark .has-gradient-bg { background: linear-gradient(135deg, #1a1b26 0%, #14151e 50%, #1a1b26 100%) !important; }
+    html.dark .has-gradient-bg::before { background: radial-gradient(circle, rgba(13, 110, 253, 0.2) 0%, transparent 70%); }
+    html.dark .has-gradient-bg::after { background: radial-gradient(circle, rgba(220, 53, 69, 0.15) 0%, transparent 70%); }
+    body, .app-sidebar, .app-topbar, .sidebar-nav .nav-link, .table, .form-control, .btn, .modal-content { transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+    @media (max-width: 991.98px) { .app-sidebar { display: none; } .app-main { margin-left: 0; } }
+    .offcanvas-body { background: var(--sidebar-bg); color: var(--sidebar-text); }
+    .offcanvas-body .sidebar-brand { color: var(--sidebar-text-hover); }
+    .offcanvas-body .nav-link { color: var(--sidebar-text); }
+    .offcanvas-header { background: var(--sidebar-bg); color: var(--sidebar-text-hover); }
+    .btn-link { color: var(--text-muted); text-decoration: none; }
+    .btn-link:hover { color: var(--text); }
+    
+    /* 背景图片管理样式 */
+    .bg-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .bg-item {
+      background: var(--card-bg);
+      border: 2px solid var(--border);
+      border-radius: var(--webui-card-radius);
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform 0.2s, border-color 0.2s;
+      position: relative;
+    }
+    .bg-item:hover { transform: translateY(-2px); border-color: var(--webui-primary); }
+    .bg-item.active { border-color: var(--webui-primary); box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.25); }
+    .bg-item img {
+      width: 100%;
+      height: 120px;
+      object-fit: cover;
+      display: block;
+    }
+    .bg-item-info {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .bg-item-actions {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.25rem;
+      display: flex;
+      gap: 0.25rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .bg-item:hover .bg-item-actions { opacity: 1; }
+    .bg-item-actions .btn {
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: none;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.75rem;
+    }
+    .bg-item-actions .btn:hover { background: rgba(0,0,0,0.8); }
+    .bg-item-actions .btn-danger:hover { background: #dc3545; }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--webui-card-radius);
+      padding: 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-zone:hover { border-color: var(--webui-primary); background: rgba(13, 110, 253, 0.05); }
+    .upload-zone.dragover { border-color: var(--webui-primary); background: rgba(13, 110, 253, 0.1); }
+    .current-bg-info {
+      padding: 0.75rem 1rem;
+      background: var(--card-bg);
+      border-radius: var(--webui-card-radius);
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+    .perm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px; }
+    .perm-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border: 1px solid var(--border, #e3e6ea); border-radius: 6px; font-size: 0.875rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <aside class="app-sidebar" id="appSidebar"></aside>
+
+  <div class="offcanvas offcanvas-start" tabindex="-1" id="appOffcanvas">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title">Mindustry</h5>
+      <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body" id="appOffcanvasBody"></div>
+  </div>
+
+  <div class="app-main">
+    <header class="app-topbar" id="appTopbar"></header>
+    <main class="app-content">
+      <div class="webui-card p-4">
+        <h4 class="mb-3" data-i18n="webui.settings.background">背景图片</h4>
+        
+        <div class="current-bg-info" id="currentBgInfo">
+          <span data-i18n="webui.settings.background.current">当前背景</span>：
+          <strong id="currentBgName" data-i18n="webui.settings.background.none">未设置（使用默认背景）</strong>
+          <button class="btn btn-sm btn-outline-secondary float-end" id="clearBgBtn" data-i18n="webui.settings.background.clear">清除背景</button>
+        </div>
+
+        <div class="upload-zone" id="uploadZone">
+          <p class="mb-2"><span data-i18n="webui.settings.background.upload">上传图片</span><span data-i18n="webui.settings.background.uploadHint">（拖拽或点击选择）</span></p>
+          <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          <p class="text-muted small mb-0" data-i18n="webui.settings.background.formats">支持 JPG / PNG / GIF / WebP</p>
+        </div>
+
+        <div class="bg-grid" id="bgGrid">
+          <div class="text-center text-muted p-4" data-i18n="webui.settings.background.noImages">暂无图片，请上传</div>
+        </div>
+      </div>
+
+      <div class="webui-card p-4 mt-3">
+        <h4 class="mb-3" data-i18n="webui.settings.theme.title">主题设置</h4>
+
+        <div class="mb-3">
+          <label class="form-label" data-i18n="webui.settings.theme.primaryColor">主色调</label>
+          <div class="d-flex align-items-center gap-2">
+            <input type="color" class="form-control form-control-color" id="primaryColor" value="#0d6efd" style="width:60px;height:40px;">
+            <input type="text" class="form-control" id="primaryColorText" value="#0d6efd" style="max-width:120px;">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><span data-i18n="webui.settings.theme.cardOpacity">卡片透明度</span>: <span id="cardOpacityVal">72</span>%</label>
+          <input type="range" class="form-range" id="cardOpacity" min="0" max="100" value="72">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><span data-i18n="webui.settings.theme.sidebarOpacity">侧边栏透明度</span>: <span id="sidebarOpacityVal">85</span>%</label>
+          <input type="range" class="form-range" id="sidebarOpacity" min="0" max="100" value="85">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label"><span data-i18n="webui.settings.theme.blurStrength">毛玻璃模糊强度</span>: <span id="blurStrengthVal">12</span>px</label>
+          <input type="range" class="form-range" id="blurStrength" min="0" max="24" value="12">
+        </div>
+
+        <div class="d-flex gap-2">
+          <button class="btn btn-primary" id="saveThemeBtn" data-i18n="webui.settings.theme.save">保存主题</button>
+          <button class="btn btn-outline-secondary" id="resetThemeBtn" data-i18n="webui.settings.theme.reset">重置默认</button>
+        </div>
+      </div>
+
+      <div class="webui-card p-4 mt-3">
+        <h4 class="mb-1" data-i18n="webui.settings.limits.title">API 访问限制</h4>
+        <p class="text-muted small mb-3" data-i18n="webui.settings.limits.hint">修改立即生效并持久化到配置文件</p>
+
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" id="rateLimitEnabled">
+          <label class="form-check-label" for="rateLimitEnabled" data-i18n="webui.settings.limits.enabled">启用速率限制</label>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label" data-i18n="webui.settings.limits.perSec">整体限速（次/秒）</label>
+            <input type="number" class="form-control" id="rateLimitPerSec" min="0" step="0.5">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" data-i18n="webui.settings.limits.burst">整体突发容量</label>
+            <input type="number" class="form-control" id="rateLimitBurst" min="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" data-i18n="webui.settings.limits.opPerSec">写操作限速（次/秒）</label>
+            <input type="number" class="form-control" id="rateOpPerSec" min="0" step="0.5">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" data-i18n="webui.settings.limits.opBurst">写操作突发容量</label>
+            <input type="number" class="form-control" id="rateOpBurst" min="1">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" data-i18n="webui.settings.limits.maxConcurrent">全局并发请求上限</label>
+            <input type="number" class="form-control" id="maxConcurrentRequests" min="1">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" data-i18n="webui.settings.limits.perNode">节点级限速覆盖（对指定权限节点单独限速，单位：次/秒）</label>
+          <div class="d-flex gap-2 mb-2">
+            <select class="form-select" id="nodeSelect" style="max-width:300px;"></select>
+            <input type="number" class="form-control" id="nodeRateInput" min="0" step="0.5" style="max-width:110px;" placeholder="次/秒" data-i18n-placeholder="webui.settings.ratePerSec">
+            <button class="btn btn-outline-primary text-nowrap" id="nodeAddBtn" data-i18n="webui.settings.limits.addNode">添加</button>
+          </div>
+          <div class="d-flex flex-wrap gap-2" id="nodeList"></div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label" data-i18n="webui.settings.limits.perApi">API 级限速覆盖（对单个 API 端点单独限速，单位：次/秒）</label>
+          <div class="d-flex gap-2 mb-2">
+            <input type="text" class="form-control" id="apiPathInput" style="max-width:300px;"
+                   data-i18n-placeholder="webui.settings.limits.apiPathPh" placeholder="如 /api/command">
+            <input type="number" class="form-control" id="apiRateInput" min="0" step="0.5" style="max-width:110px;" placeholder="次/秒" data-i18n-placeholder="webui.settings.ratePerSec">
+            <button class="btn btn-outline-primary text-nowrap" id="apiAddBtn" data-i18n="webui.settings.limits.addApi">添加</button>
+          </div>
+          <div class="d-flex flex-wrap gap-2" id="apiList"></div>
+        </div>
+
+        <button class="btn btn-primary" id="saveLimitsBtn" data-i18n="webui.settings.limits.save">保存限制配置</button>
+      </div>
+
+      <div class="webui-card p-4 mt-3">
+        <h4 class="mb-1" data-i18n="webui.settings.keys.title">API 密钥</h4>
+        <p class="text-muted small mb-3" data-i18n="webui.settings.keys.hint">密钥供外部脚本/第三方调用 API 使用，独立权限，删除即撤销</p>
+
+        <div class="bg-body-tertiary border rounded p-3 mb-3">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <label class="form-label" data-i18n="webui.settings.keys.name">密钥名称</label>
+              <input type="text" class="form-control" id="keyNameInput" data-i18n-placeholder="webui.settings.keys.namePh">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" data-i18n="webui.settings.keys.expire">过期天数（0=永不过期）</label>
+              <input type="number" class="form-control" id="keyExpireInput" min="0" max="3650" value="0">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label" data-i18n="webui.settings.keys.rate">限速（次/秒）</label>
+              <input type="number" class="form-control" id="keyRateInput" min="0" step="0.5" value="0">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" data-i18n="webui.settings.keys.perms">权限节点</label>
+              <div class="perm-grid" id="keyPermGrid" style="max-height:170px;overflow-y:auto;"></div>
+            </div>
+          </div>
+          <button class="btn btn-primary mt-2" id="keyCreateBtn" data-i18n="webui.settings.keys.create">生成密钥</button>
+        </div>
+
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th data-i18n="webui.settings.keys.colName">名称</th>
+              <th data-i18n="webui.settings.keys.colPerms">权限数</th>
+              <th data-i18n="webui.settings.keys.colRate">限速</th>
+              <th data-i18n="webui.settings.keys.colCreated">创建时间</th>
+              <th data-i18n="webui.settings.keys.colExpire">过期时间</th>
+              <th class="text-end"></th>
+            </tr>
+          </thead>
+          <tbody id="keysTbody"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- 密钥编辑弹窗 -->
+  <div class="modal fade" id="keyEditModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="webui.settings.keys.editTitle">编辑密钥</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-2">
+            <div class="col-md-4">
+              <label class="form-label" data-i18n="webui.settings.keys.name">密钥名称</label>
+              <input type="text" class="form-control" id="keyEditName">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" data-i18n="webui.settings.keys.expire">过期天数（0=永不过期）</label>
+              <input type="number" class="form-control" id="keyEditExpire" min="0" max="3650">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" data-i18n="webui.settings.keys.rate">限速（次/秒，0=跟随全局）</label>
+              <input type="number" class="form-control" id="keyEditRate" min="0" step="0.5">
+            </div>
+          </div>
+          <div class="mt-2">
+            <label class="form-label" data-i18n="webui.settings.keys.perms">权限节点</label>
+            <div class="perm-grid" id="keyEditPermGrid" style="max-height:200px;overflow-y:auto;"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-i18n="webui.settings.keys.cancel">取消</button>
+          <button type="button" class="btn btn-primary" id="keyEditSaveBtn" data-i18n="webui.settings.keys.saveEdit">保存修改</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 密钥生成结果弹窗 -->
+  <div class="modal fade" id="keyResultModal" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" data-i18n="webui.settings.keys.resultTitle">密钥已生成</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-warning py-2" data-i18n="webui.settings.keys.resultHint">请立即复制保存，密钥仅显示这一次！</div>
+          <textarea class="form-control" id="keyResultSecret" rows="2" readonly></textarea>
+          <button class="btn btn-sm btn-outline-secondary mt-2" id="keyCopyBtn" data-i18n="webui.settings.keys.copy">复制</button>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal" data-i18n="webui.settings.keys.done">我知道了</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/bootstrap.bundle.min.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    (function () {
+      var currentBg = '';
+
+      function loadBackgrounds() {
+        WebUI.apiGet('/api/background/list').then(function (res) {
+          currentBg = res.current || '';
+          var currentNameEl = document.getElementById('currentBgName');
+          if (currentBg) {
+            currentNameEl.textContent = currentBg;
+          } else {
+            currentNameEl.textContent = WebUI.t('webui.settings.background.none', '未设置（使用默认背景）');
+          }
+          
+          var grid = document.getElementById('bgGrid');
+          var files = res.files || [];
+          if (!files.length) {
+            grid.innerHTML = '<div class="text-center text-muted p-4">' + WebUI.t('webui.settings.background.noImages', '暂无图片，请上传') + '</div>';
+            return;
+          }
+          grid.innerHTML = files.map(function (f) {
+            var active = (f.name === currentBg) ? ' active' : '';
+            var sizeStr = (f.size / 1024).toFixed(1) + ' KB';
+            return '<div class="bg-item' + active + '" data-name="' + WebUI.escapeHtml(f.name) + '">' +
+              '<img src="' + f.url + '" alt="' + WebUI.escapeHtml(f.name) + '" loading="lazy">' +
+              '<div class="bg-item-actions">' +
+                '<button class="btn btn-danger btn-sm delete-btn" data-name="' + WebUI.escapeHtml(f.name) + '" title="' + WebUI.t('webui.settings.background.delete', '删除') + '">&times;</button>' +
+              '</div>' +
+              '<div class="bg-item-info">' + WebUI.escapeHtml(f.name) + ' (' + sizeStr + ')</div>' +
+            '</div>';
+          }).join('');
+          
+          // 绑定点击选择
+          var items = grid.querySelectorAll('.bg-item');
+          for (var i = 0; i < items.length; i++) {
+            items[i].addEventListener('click', function (e) {
+              if (e.target.classList.contains('delete-btn')) return;
+              var name = this.getAttribute('data-name');
+              setBackground(name);
+            });
+          }
+          // 绑定删除
+          var delBtns = grid.querySelectorAll('.delete-btn');
+          for (var i = 0; i < delBtns.length; i++) {
+            delBtns[i].addEventListener('click', function (e) {
+              e.stopPropagation();
+              var name = this.getAttribute('data-name');
+              if (confirm(WebUI.t('webui.settings.background.confirmDelete', '确认删除此图片？'))) {
+                deleteImage(name);
+              }
+            });
+          }
+        }).catch(function (e) {
+          WebUI.toast(e.message || WebUI.t('webui.common.loadFailed', '加载失败'), 'error');
+        });
+      }
+
+      function setBackground(name) {
+        WebUI.apiPost('/api/background/set', { name: name }).then(function () {
+          WebUI.toast(WebUI.t('webui.settings.background.setSuccess', '背景已设置'), 'success');
+          loadBackgrounds();
+        }).catch(function (e) {
+          WebUI.toast(e.message || WebUI.t('webui.settings.saveFailed', '设置失败'), 'error');
+        });
+      }
+
+      function deleteImage(name) {
+        WebUI.apiPost('/api/background/delete', { name: name }).then(function () {
+          WebUI.toast(WebUI.t('webui.settings.background.deleteSuccess', '删除成功'), 'success');
+          loadBackgrounds();
+        }).catch(function (e) {
+          WebUI.toast(e.message || WebUI.t('webui.common.deleteFailed', '删除失败'), 'error');
+        });
+      }
+
+      function uploadFile(file) {
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+          WebUI.toast(WebUI.t('webui.settings.background.selectImage', '请选择图片文件'), 'error');
+          return;
+        }
+        var formData = new FormData();
+        formData.append('file', file);
+        fetch('/api/background/upload', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + WebUI.getToken() },
+          body: formData
+        }).then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res.code === 0 || res.code === 200) {
+              WebUI.toast(WebUI.t('webui.settings.background.uploadSuccess', '上传成功'), 'success');
+              loadBackgrounds();
+            } else {
+              WebUI.toast(res.msg || WebUI.t('webui.settings.background.uploadFailed', '上传失败'), 'error');
+            }
+          })
+          .catch(function () {
+            WebUI.toast(WebUI.t('webui.settings.background.uploadFailed', '上传失败'), 'error');
+          });
+      }
+
+      // 主题自定义
+      function initThemeSettings() {
+        var custom = WebUI.getCustomTheme();
+        var primaryColor = document.getElementById('primaryColor');
+        var primaryColorText = document.getElementById('primaryColorText');
+        var cardOpacity = document.getElementById('cardOpacity');
+        var cardOpacityVal = document.getElementById('cardOpacityVal');
+        var sidebarOpacity = document.getElementById('sidebarOpacity');
+        var sidebarOpacityVal = document.getElementById('sidebarOpacityVal');
+        var blurStrength = document.getElementById('blurStrength');
+        var blurStrengthVal = document.getElementById('blurStrengthVal');
+
+        // 加载保存的值
+        if (custom.primary) {
+          primaryColor.value = custom.primary;
+          primaryColorText.value = custom.primary;
+        }
+        if (custom.cardOpacity !== undefined) {
+          cardOpacity.value = custom.cardOpacity;
+          cardOpacityVal.textContent = custom.cardOpacity;
+        }
+        if (custom.sidebarOpacity !== undefined) {
+          sidebarOpacity.value = custom.sidebarOpacity;
+          sidebarOpacityVal.textContent = custom.sidebarOpacity;
+        }
+        if (custom.blurStrength !== undefined) {
+          blurStrength.value = custom.blurStrength;
+          blurStrengthVal.textContent = custom.blurStrength;
+        }
+
+        // 实时预览
+        primaryColor.addEventListener('input', function() {
+          primaryColorText.value = this.value;
+          document.documentElement.style.setProperty('--webui-primary', this.value);
+        });
+        primaryColorText.addEventListener('input', function() {
+          if (/^#[0-9a-fA-F]{6}$/.test(this.value)) {
+            primaryColor.value = this.value;
+            document.documentElement.style.setProperty('--webui-primary', this.value);
+          }
+        });
+        cardOpacity.addEventListener('input', function() {
+          cardOpacityVal.textContent = this.value;
+          var isDark = document.documentElement.classList.contains('dark');
+          var r = isDark ? 35 : 255, g = isDark ? 38 : 255, b = isDark ? 50 : 255;
+          document.documentElement.style.setProperty('--card-bg', 'rgba(' + r + ',' + g + ',' + b + ',' + (this.value/100) + ')');
+        });
+        sidebarOpacity.addEventListener('input', function() {
+          sidebarOpacityVal.textContent = this.value;
+          var isDark = document.documentElement.classList.contains('dark');
+          var r = isDark ? 20 : 30, g = isDark ? 22 : 33, b = isDark ? 30 : 40;
+          document.documentElement.style.setProperty('--sidebar-bg', 'rgba(' + r + ',' + g + ',' + b + ',' + (this.value/100) + ')');
+        });
+        blurStrength.addEventListener('input', function() {
+          blurStrengthVal.textContent = this.value;
+          document.documentElement.style.setProperty('--glass-blur', 'blur(' + this.value + 'px) saturate(150%)');
+        });
+
+        // 保存
+        document.getElementById('saveThemeBtn').addEventListener('click', function() {
+          WebUI.saveCustomTheme({
+            primary: primaryColor.value,
+            cardOpacity: parseInt(cardOpacity.value),
+            sidebarOpacity: parseInt(sidebarOpacity.value),
+            blurStrength: parseInt(blurStrength.value)
+          });
+          WebUI.applyCustomTheme();
+          WebUI.toast(WebUI.t('webui.settings.theme.saved', '主题已保存'), 'success');
+        });
+
+        // 重置
+        document.getElementById('resetThemeBtn').addEventListener('click', function() {
+          localStorage.removeItem('webui_theme_custom');
+          document.documentElement.style.removeProperty('--webui-primary');
+          document.documentElement.style.removeProperty('--card-bg');
+          document.documentElement.style.removeProperty('--sidebar-bg');
+          document.documentElement.style.removeProperty('--glass-blur');
+          primaryColor.value = '#0d6efd';
+          primaryColorText.value = '#0d6efd';
+          cardOpacity.value = 72;
+          cardOpacityVal.textContent = '72';
+          sidebarOpacity.value = 85;
+          sidebarOpacityVal.textContent = '85';
+          blurStrength.value = 12;
+          blurStrengthVal.textContent = '12';
+          WebUI.toast(WebUI.t('webui.settings.theme.resetDone', '已重置为默认主题'), 'success');
+        });
+      }
+
+      // ===== API 访问限制 =====
+      var nodeOverrides = {};
+      var apiOverrides = {};
+
+      function renderChipList(listEl, map, onDelete) {
+        listEl.innerHTML = '';
+        var keys = Object.keys(map).sort();
+        if (!keys.length) return;
+        keys.forEach(function (n) {
+          var chip = document.createElement('span');
+          chip.className = 'badge text-bg-light border d-inline-flex align-items-center gap-1';
+          chip.appendChild(document.createTextNode(n + ': ' + map[n] + '/s'));
+          var del = document.createElement('a');
+          del.href = '#';
+          del.className = 'text-danger text-decoration-none ms-1';
+          del.textContent = '×';
+          del.addEventListener('click', function (e) {
+            e.preventDefault();
+            onDelete(n);
+          });
+          chip.appendChild(del);
+          listEl.appendChild(chip);
+        });
+      }
+
+      function renderNodeList() {
+        var list = document.getElementById('nodeList');
+        if (!Object.keys(nodeOverrides).length) {
+          list.innerHTML = '<span class="text-muted small">' + WebUI.t('webui.settings.limits.noNode', '无节点覆盖，所有节点使用整体限速') + '</span>';
+          return;
+        }
+        renderChipList(list, nodeOverrides, function (n) { delete nodeOverrides[n]; renderNodeList(); });
+      }
+
+      function renderApiList() {
+        var list = document.getElementById('apiList');
+        if (!Object.keys(apiOverrides).length) {
+          list.innerHTML = '<span class="text-muted small">' + WebUI.t('webui.settings.limits.noApi', '无 API 覆盖，所有端点使用整体限速') + '</span>';
+          return;
+        }
+        renderChipList(list, apiOverrides, function (n) { delete apiOverrides[n]; renderApiList(); });
+      }
+
+      function loadLimits() {
+        return WebUI.apiGet('/api/config/limits').then(function (cfg) {
+          document.getElementById('rateLimitEnabled').checked = !!cfg.rateLimitEnabled;
+          document.getElementById('rateLimitPerSec').value = cfg.rateLimitPerSec;
+          document.getElementById('rateLimitBurst').value = cfg.rateLimitBurst;
+          document.getElementById('rateOpPerSec').value = cfg.rateOpPerSec;
+          document.getElementById('rateOpBurst').value = cfg.rateOpBurst;
+          document.getElementById('maxConcurrentRequests').value = cfg.maxConcurrentRequests;
+          document.getElementById('mapImageConcurrency').value = cfg.mapImageConcurrency;
+          document.getElementById('mapImageCacheSec').value = cfg.mapImageCacheSec;
+          nodeOverrides = cfg.rateLimitPerNode || {};
+          renderNodeList();
+          apiOverrides = cfg.rateLimitPerApi || {};
+          renderApiList();
+        });
+      }
+
+      function loadNodeOptions() {
+        return WebUI.apiGet('/api/users/perm-nodes').then(function (nodes) {
+          var sel = document.getElementById('nodeSelect');
+          nodes.forEach(function (n) {
+            var opt = document.createElement('option');
+            opt.value = n.node;
+            opt.textContent = WebUI.t(n.key, n.node);
+            sel.appendChild(opt);
+          });
+        });
+      }
+
+      function saveLimits() {
+        var body = {
+          rateLimitEnabled: document.getElementById('rateLimitEnabled').checked,
+          rateLimitPerSec: parseFloat(document.getElementById('rateLimitPerSec').value) || 0,
+          rateLimitBurst: parseInt(document.getElementById('rateLimitBurst').value) || 1,
+          rateOpPerSec: parseFloat(document.getElementById('rateOpPerSec').value) || 0,
+          rateOpBurst: parseInt(document.getElementById('rateOpBurst').value) || 1,
+          maxConcurrentRequests: parseInt(document.getElementById('maxConcurrentRequests').value) || 32,
+          mapImageConcurrency: parseInt(document.getElementById('mapImageConcurrency').value) || 1,
+          mapImageCacheSec: parseInt(document.getElementById('mapImageCacheSec').value) || 120,
+          rateLimitPerNode: nodeOverrides,
+          rateLimitPerApi: apiOverrides
+        };
+        return WebUI.apiPost('/api/config/limits', body);
+      }
+
+      // ===== API 密钥 =====
+      var KEYS = [];
+      var EDITING_KEY = null;
+      var PERM_NODES = [];
+
+      function loadKeys() {
+        return WebUI.apiGet('/api/keys').then(function (keys) {
+          KEYS = keys || [];
+          var tbody = document.getElementById('keysTbody');
+          if (!KEYS.length) {
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">' + WebUI.t('webui.settings.keys.empty', '暂无密钥') + '</td></tr>';
+            return;
+          }
+          tbody.innerHTML = KEYS.map(function (k) {
+            var exp = k.expiresAt ? new Date(k.expiresAt).toLocaleString() : WebUI.t('webui.settings.keys.never', '永不过期');
+            var created = new Date(k.createdAt).toLocaleString();
+            var rate = k.rateLimit > 0 ? k.rateLimit + '/s' : WebUI.t('webui.settings.keys.rateGlobal', '跟随全局');
+            return '<tr>' +
+              '<td>' + WebUI.escapeHtml(k.name) + '</td>' +
+              '<td><span class="badge text-bg-secondary">' + (k.permissions || []).length + '</span></td>' +
+              '<td class="small">' + rate + '</td>' +
+              '<td class="small text-muted">' + created + '</td>' +
+              '<td class="small text-muted">' + exp + '</td>' +
+              '<td class="text-end text-nowrap">' +
+                '<button class="btn btn-sm btn-outline-secondary me-1" data-edit="' + WebUI.escapeHtml(k.id) + '">' + WebUI.t('webui.settings.keys.edit', '编辑') + '</button>' +
+                '<button class="btn btn-sm btn-outline-danger" data-del="' + WebUI.escapeHtml(k.id) + '">' + WebUI.t('webui.settings.keys.delete', '删除') + '</button>' +
+              '</td>' +
+              '</tr>';
+          }).join('');
+          tbody.querySelectorAll('button[data-del]').forEach(function (b) {
+            b.addEventListener('click', function () {
+              if (confirm(WebUI.t('webui.settings.keys.confirmDelete', '确认删除此密钥？删除后立即失效。'))) {
+                WebUI.apiDelete('/api/keys/' + b.getAttribute('data-del')).then(function () {
+                  WebUI.toast(WebUI.t('webui.settings.keys.deleted', '密钥已删除'), 'success');
+                  loadKeys();
+                }).catch(function (e) {
+                  WebUI.toast(e.message || WebUI.t('webui.common.deleteFailed', '删除失败'), 'error');
+                });
+              }
+            });
+          });
+          tbody.querySelectorAll('button[data-edit]').forEach(function (b) {
+            b.addEventListener('click', function () { openKeyEdit(b.getAttribute('data-edit')); });
+          });
+        });
+      }
+
+      function openKeyEdit(id) {
+        var k = KEYS.find(function (x) { return x.id === id; });
+        if (!k) return;
+        EDITING_KEY = k;
+        document.getElementById('keyEditName').value = k.name;
+        var expireDays = k.expiresAt ? Math.max(1, Math.ceil((k.expiresAt - Date.now()) / 86400000)) : 0;
+        document.getElementById('keyEditExpire').value = expireDays;
+        document.getElementById('keyEditRate').value = k.rateLimit || 0;
+        var grid = document.getElementById('keyEditPermGrid');
+        if (!PERM_NODES.length) {
+          loadKeyPermGrid().then(function () { fillEditPerms(k.permissions || []); });
+        } else {
+          fillEditPerms(k.permissions || []);
+        }
+        new bootstrap.Modal(document.getElementById('keyEditModal')).show();
+      }
+
+      function fillEditPerms(selected) {
+        var grid = document.getElementById('keyEditPermGrid');
+        grid.innerHTML = PERM_NODES.map(function (p) {
+          var checked = selected.indexOf(p.node) >= 0 ? ' checked' : '';
+          return '<label class="perm-item"><input type="checkbox" class="perm-check" value="' + WebUI.escapeHtml(p.node) + '"' + checked + '> ' +
+            WebUI.escapeHtml(WebUI.t(p.key, p.node)) + '</label>';
+        }).join('');
+      }
+
+      function loadKeyPermGrid() {
+        return WebUI.apiGet('/api/users/perm-nodes').then(function (nodes) {
+          PERM_NODES = nodes || [];
+          var grid = document.getElementById('keyPermGrid');
+          if (!nodes.length) {
+            grid.innerHTML = '<span class="text-muted small">' + WebUI.t('webui.settings.keys.noNodes', '无可用权限节点') + '</span>';
+            return;
+          }
+          grid.innerHTML = nodes.map(function (p) {
+            return '<label class="perm-item"><input type="checkbox" class="perm-check" value="' + WebUI.escapeHtml(p.node) + '"> ' +
+              WebUI.escapeHtml(WebUI.t(p.key, p.node)) + '</label>';
+          }).join('');
+        });
+      }
+
+      function createKey() {
+        var name = document.getElementById('keyNameInput').value.trim();
+        if (!name) {
+          WebUI.toast(WebUI.t('webui.settings.keys.nameRequired', '请输入密钥名称'), 'error');
+          return;
+        }
+        var expireDays = parseInt(document.getElementById('keyExpireInput').value) || 0;
+        var rateLimit = parseFloat(document.getElementById('keyRateInput').value) || 0;
+        var perms = [];
+        document.querySelectorAll('#keyPermGrid .perm-check:checked').forEach(function (c) { perms.push(c.value); });
+        var btn = document.getElementById('keyCreateBtn');
+        btn.disabled = true;
+        WebUI.apiPost('/api/keys', { name: name, permissions: perms, expireDays: expireDays, rateLimit: rateLimit }).then(function (res) {
+          document.getElementById('keyResultSecret').value = res.secret;
+          new bootstrap.Modal(document.getElementById('keyResultModal')).show();
+          document.getElementById('keyNameInput').value = '';
+          document.querySelectorAll('#keyPermGrid .perm-check').forEach(function (c) { c.checked = false; });
+          loadKeys();
+        }).catch(function (e) {
+          WebUI.toast(e.message || WebUI.t('webui.settings.colorGenFailed', '生成失败'), 'error');
+        }).then(function () {
+          btn.disabled = false;
+        });
+      }
+
+      WebUI.initPage('settings', 'webui.settings.title', '设置').then(function () {
+        loadBackgrounds();
+        initThemeSettings();
+        loadLimits();
+        loadNodeOptions();
+        loadKeys();
+        loadKeyPermGrid();
+
+        // 保存限制配置
+        document.getElementById('saveLimitsBtn').addEventListener('click', function () {
+          var btn = this;
+          btn.disabled = true;
+          saveLimits().then(function () {
+            WebUI.toast(WebUI.t('webui.settings.limits.saved', '限制配置已保存并生效'), 'success');
+          }).catch(function (e) {
+            WebUI.toast(e.message || '保存失败', 'error');
+          }).then(function () {
+            btn.disabled = false;
+          });
+        });
+
+        // 节点覆盖添加
+        document.getElementById('nodeAddBtn').addEventListener('click', function () {
+          var sel = document.getElementById('nodeSelect');
+          var rate = parseFloat(document.getElementById('nodeRateInput').value);
+          if (!sel.value || !(rate > 0)) {
+            WebUI.toast(WebUI.t('webui.settings.limits.nodeInvalid', '请选择节点并输入速率'), 'error');
+            return;
+          }
+          nodeOverrides[sel.value] = rate;
+          renderNodeList();
+        });
+
+        // API 级覆盖添加
+        document.getElementById('apiAddBtn').addEventListener('click', function () {
+          var path = document.getElementById('apiPathInput').value.trim();
+          var rate = parseFloat(document.getElementById('apiRateInput').value);
+          if (!path.startsWith('/') || !(rate > 0)) {
+            WebUI.toast(WebUI.t('webui.settings.limits.apiInvalid', '请输入 API 路径（如 /api/command）和速率'), 'error');
+            return;
+          }
+          apiOverrides[path] = rate;
+          renderApiList();
+        });
+
+        // 密钥编辑保存
+        document.getElementById('keyEditSaveBtn').addEventListener('click', function () {
+          if (!EDITING_KEY) return;
+          var name = document.getElementById('keyEditName').value.trim();
+          var expireDays = parseInt(document.getElementById('keyEditExpire').value) || 0;
+          var rateLimit = parseFloat(document.getElementById('keyEditRate').value) || 0;
+          if (!name) {
+            WebUI.toast(WebUI.t('webui.settings.keys.nameRequired', '请输入密钥名称'), 'error');
+            return;
+          }
+          var perms = [];
+          document.querySelectorAll('#keyEditPermGrid .perm-check:checked').forEach(function (c) { perms.push(c.value); });
+          var btn = this;
+          btn.disabled = true;
+          WebUI.apiPut('/api/keys/' + EDITING_KEY.id, { name: name, permissions: perms, expireDays: expireDays, rateLimit: rateLimit }).then(function () {
+            WebUI.toast(WebUI.t('webui.settings.keys.edited', '密钥已更新'), 'success');
+            bootstrap.Modal.getInstance(document.getElementById('keyEditModal')).hide();
+            loadKeys();
+          }).catch(function (e) {
+            WebUI.toast(e.message || '保存失败', 'error');
+          }).then(function () { btn.disabled = false; });
+        });
+
+        // 密钥生成/复制
+        document.getElementById('keyCreateBtn').addEventListener('click', createKey);
+        document.getElementById('keyCopyBtn').addEventListener('click', function () {
+          var ta = document.getElementById('keyResultSecret');
+          ta.select();
+          if (navigator.clipboard) navigator.clipboard.writeText(ta.value);
+          WebUI.toast(WebUI.t('webui.settings.keys.copied', '已复制'), 'success');
+        });
+
+        // 上传需要 webui.api.backgroundUpload 权限; 无权限时隐藏上传区(仍可从图库选择)
+        if (!WebUI.hasPerm('webui.api.backgroundUpload')) {
+          var upZone = document.getElementById('uploadZone');
+          if (upZone) upZone.style.display = 'none';
+        }
+
+        // 上传
+        var uploadZone = document.getElementById('uploadZone');
+        var fileInput = document.getElementById('fileInput');
+        uploadZone.addEventListener('click', function () { fileInput.click(); });
+        fileInput.addEventListener('change', function () {
+          if (this.files && this.files[0]) uploadFile(this.files[0]);
+          this.value = '';
+        });
+        // 拖拽上传
+        uploadZone.addEventListener('dragover', function (e) {
+          e.preventDefault();
+          this.classList.add('dragover');
+        });
+        uploadZone.addEventListener('dragleave', function () { this.classList.remove('dragover'); });
+        uploadZone.addEventListener('drop', function (e) {
+          e.preventDefault();
+          this.classList.remove('dragover');
+          if (e.dataTransfer.files && e.dataTransfer.files[0]) uploadFile(e.dataTransfer.files[0]);
+        });
+
+        // 清除背景
+        document.getElementById('clearBgBtn').addEventListener('click', function () {
+          WebUI.apiPost('/api/background/set', { name: '' }).then(function () {
+            WebUI.toast(WebUI.t('webui.settings.background.clearSuccess', '已恢复默认背景'), 'success');
+            loadBackgrounds();
+          }).catch(function (e) {
+            WebUI.toast(e.message || '操作失败', 'error');
+          });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+java -Djava.net.preferIPv4Stack=true --enable-native-access=ALL-UNNAMED --enable-final-field-mutation=ALL-UNNAMED -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=./dumps/ -Xlog:gc*:file=./dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m -jar server.jar

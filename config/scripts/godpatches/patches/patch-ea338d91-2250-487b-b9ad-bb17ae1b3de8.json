@@ -1,0 +1,554 @@
+{
+    "name": "劉——建築重構",
+    "block":
+    {
+        "solar-panel":
+        {
+            "powerProduction": 0.24,
+            "requirements": ["lead/10","metaglass/8","silicon/5"]
+        },
+        "molten-slag": {
+            "attributes":{
+		       "heat": 1
+            }
+        },
+        "solar-panel-large":
+        {
+            "powerProduction": 3.2,
+            "requirements": ["titanium/60","metaglass/100","silicon/70"]
+        },
+        "silicon-crucible":
+        {
+            //"description": "",
+            "baseEfficiency": 1,
+            "boostScale": 0.2777778,
+            "maxBoost": 2147483647,
+            "floating": "true",
+            "consumes":
+            {
+                "power": 5
+            },
+            "requirements": ["metaglass/90","titanium/120","silicon/80","plastanium/60"]
+        },
+        "cultivator":
+        {
+            "maxBoost": 2147483647,
+            "craftTime": "50",
+            "boostScale": 1.2499999999
+        },
+        "bridge-conveyor": 
+        {
+            "range": 6,
+            "speed": 1,
+            "bufferCapacity": 20,
+            "displayedSpeed": 15,
+            "requirements": ["copper/12","lead/12"]
+        },
+        "graphite-press":
+        {
+            "craftTime": 60
+        },
+        "bridge-conduit":
+        {
+            "range": 6,
+            "requirements": 
+            ["metaglass/12","graphite/6"]
+        },
+        "phase-conduit":
+        {
+            "description":"由相位织物制成的传输节点，通过外部能量供应，于两点之间构建并维持一条用于液体传输的空间通道",
+            "range": 20,
+            "floating": "true",
+            "requirements": ["metaglass/20","titanium/10","silicon/8","phase-fabric/8"]
+        },
+        "phase-conveyor":
+        {
+            "description": "由相位织物制成的传输节点，通过外部能量供应，于两点之间构建并维持一条用于物品传输的空间通道",
+            "range": 20,
+            "floating": "true",
+            "itemCapacity": 30,
+            "requirements": ["lead/10","graphite/10","silicon/8","phase-fabric/8"]
+        },
+        "surge-tower": {
+            "maxNodes": 3,
+            "laserRange": 50
+        },
+        "unloader":
+        {
+            "speed": 4
+        },
+        "plastanium-conveyor":
+        {
+            "speed": 0.075
+        },
+        "pneumatic-drill":
+        {
+            "drillTime": 200
+        },
+        "mechanical-drill":
+        {
+            "drillTime": 300
+        },
+        "junction": {
+            "speed": 22.5
+        },
+        "laser-drill": 
+        {
+            "itemCapacity": 15,
+            "drillTime": 100,
+            "updateEffect": {
+                "type": "MultiEffect",
+                "effects": [
+                    {
+                        "type": "ParticleEffect",
+                        "particles": 4,
+                        "line": true,
+                        "strokeFrom": 3,
+                        "strokeTo": 0,
+                        "lenFrom": 10,
+                        "lenTo": 0,
+                        "length": 20,
+                        "baseLength": 0,
+                        "lifetime": 10,
+                        "colorFrom": "FFFFFF",
+                        "colorTo": "FFFFFF"
+                    },
+                    {
+                        "type": "ParticleEffect",
+                        "particles": 4,
+                        "strokeFrom": 3,
+                        "strokeTo": 0,
+                        "lenFrom": 10,
+                        "lenTo": 0,
+                        "length": 20,
+                        "baseLength": 0,
+                        "lifetime": 10,
+                        "colorFrom": "FFFFFF",
+                        "colorTo": "FFFFFF"
+                    }
+                ]
+            }
+        },
+        "blast-drill": 
+        {
+            "itemCapacity": 40,
+            "consumes": {
+                "power": 4
+            },
+            "drillEffect": "mineImpact",
+            "updateEffect": 
+            {
+                "type": "MultiEffect",
+                "effects": [
+                    {
+				        "type": "WrapEffect",
+				        "effect": "drillSteam",
+                        "lifetime": 10,
+                        "rotation": 16
+                    },
+                    {
+                        "type": "WrapEffect",
+				        "effect": "blastExplosion",
+                        "rotation": 40
+                    }
+                ]
+            },
+            "drillTime": 50,
+            "requirements": ["copper/130","titanium/80","silicon/110","thorium/100"]
+        },
+        "impact-reactor":
+        {
+            "localizedName": "衝擊反應堆",
+            "description": "以高能爆炸物在反应腔中心引爆作为能量获取的起点。爆炸释放的能量经由内部相位织物构成的反应腔偏折引导，稳定传递至电涌合金部件，并利用压电效应，将机械能直接转换为电能。\n\n需注意的是，装置启动前须先以电力激发相位织物并引爆爆炸物；运行过程中还需持续通入冷却液，以维持系统稳定。",
+            "warmupSpeed": 0.002,
+        	"powerProduction": 200,
+            "itemDuration": 165,
+            "consumes": {
+                "remove": "all",
+                "power": 35,
+        		"liquid": {
+                    "liquid": "cryofluid",
+                    "amount": 0.5
+                },
+                "items": [
+                    "blast-compound/5"
+                ]
+            },
+            "requirements": ["lead/500","metaglass/250","graphite/400","silicon/300","phase-fabric/125","surge-alloy/250"]
+        },
+        "conveyor": {
+            "speed": 0.053571428,
+            "displayedSpeed": 7.5
+        },
+        "armored-conveyor":
+        {
+            "speed": 0.110142857,
+            "displayedSpeed": 15
+        },
+        "titanium-conveyor":
+        {
+            "speed": 0.110142857,
+            "displayedSpeed": 15
+        },
+        "overdrive-dome":
+        {
+            "localizedName": "超速穹頂",
+            "description": "第二代时间加速设备，仍锚定于宇宙基准时空节点。\n借助第一代设备的技术，加速场边界支持物质的安全交换，并在供能中断时能以指数形式平缓坍缩，避免时空结构损伤\n\n通过若干相位织物单元按特定拓扑序编织，在主时空持续“撑开”相位开口，连通多重相位叠加空间。\n利用主时空与叠加空间之间的本质时间流速差，使开口成为时间特性的传导界面，以此达到加速时间的目的。\n\n该设备需通过额外能量的注入，引导涌入的时间特征形成稳定场态；在无外部能量输入时，则将这些特征泄流至时空基底中。\n\n此设备额外搭载了相位强化模块，能够以相位织物为消耗媒介，利用其“原子存在于多重相位之间”的特性，在量子层面从物理上撑大开口的拓扑结构，从而引导更多时间特征涌入。\n在此过程中，相位织物因逐步退相干而最终归于基态物质，即被消耗。\n\n该设备依赖被打开的时空开口运行。\n一旦装置被摧毁，编织开口的相位织物单元将发生拓扑序退相干，进而引发相位相干性级联坍塌，致使开口失去织物约束，形成一个因依赖特定相位织物结构而只能短暂留存的时空断层",
+            "health": 725,
+            "range": 150,
+            "useTime": 120,
+            "speedBoost": 2,
+            "phaseRangeBoost": 100,
+            "speedBoostPhase": 1,
+            "hasBoost": true,
+            "destroyBullet": 
+            {
+		        "type": "EmpBulletType",
+                "timeIncrease": 0,
+		        "powerDamageScl": 2,
+                "splashDamageRadius": 160,
+                "splashDamage": 875,
+                "buildingDamageMultiplier": 1,
+                "pierceArmor": true,
+                "absorbable": false,
+                "hittable": false,
+                "collides": false,
+                "width": 0,
+                "height": 0,
+                "shrinkX": 0,
+                "shrinkY": 0,
+                "layer": 120,
+                "damage": 6000,
+                "hitShake": 50,
+                "speed": 0,
+                "hitEffect": "none",
+                "applyEffect": "none",
+                "chainEffect": "none",
+                "hitPowerEffect": "none",
+                "despawnEffect": "none",
+                "parts": [
+                    {
+                        "type": "ShapePart",
+                        "color": "000000",
+                        "rotateSpeed": 0,
+                        "circle": true,
+                        "hollow": false,
+                        "radius": 140,
+                        "radiusTo": 140,
+                        "layer": 110
+                    },
+                    {
+                        "type": "ShapePart",
+                        "color": "F19583",
+                        "rotateSpeed": 0,
+                        "stroke": 9,
+                        "strokeTo": 9,
+                        "circle": true,
+                        "hollow": true,
+                        "radius": 140,
+                        "radiusTo": 140,
+                        "layer": 110
+                    },
+                    {
+                        "type": "HaloPart",
+                        "sides": 3,
+                        "shapes": 3,
+                        "color": "F8B591",
+                        "tri": true,
+                        "layer": 110.0000000001,
+                        "radius": 22,
+                        "radiusTo": 22,
+                        "triLength": 120,
+                        "triLengthTo": 120,
+                        "haloRadius": 140,
+                        "haloRotation": 240,
+                        "haloRotateSpeed": -2.5
+                    },
+                    {
+                        "type": "HaloPart",
+                        "sides": 3,
+                        "shapes": 3,
+                        "color": "F8B591",
+                        "tri": true,
+                        "layer": 110.0000000001,
+                        "radius": 22,
+                        "radiusTo": 22,
+                        "triLength": 90,
+                        "triLengthTo": 90,
+                        "shapeRotation": 180,
+                        "haloRadius": 140,
+                        "haloRotation": 240,
+                        "haloRotateSpeed": -2.5
+                    }
+                ],
+                "collidesAir": true,
+                "lifetime": 300,
+                "trailInterval": 7.5,
+                "trailEffect": {
+                    "type": "MultiEffect",
+                    "effects": [
+                        {
+                            "type": "WaveEffect",
+                            "interp": "circleOut",
+                            "lifetime": 20,
+                            "sizeFrom": 0,
+                            "sizeTo": 140,
+                            "strokeFrom": 0,
+                            "strokeTo": 8,
+                            "colorFrom": "F8B591",
+                            "colorTo": "F8B591"
+                        }
+                    ]
+                },
+                "spawnBullets": [
+                    {
+                        "type": "BulletType",
+                        "speed": 0,
+                        "lifetime": 255,
+                        "damage": 0,
+                        "splashDamage": 0,
+                        "collides": false,
+                        "absorbable": false,
+                        "hittable": false,
+                        "bulletInterval": 7.5,
+                        "intervalBullets": 1,
+                        "intervalRandomSpread": 0,
+                        "incendSpread": 0,
+                        "intervalAngle": 0,
+                        "intervalBullet": {
+                            "type": "EmpBulletType",
+                            "speed": 0,
+                            "lifetime": 0,
+                            "collides": false,
+                            "absorbable": false,
+                            "hittable": false,
+                            "pierceArmor": true,
+                            "splashDamage": 30,
+                            "splashDamageRadius": 140,
+                            "unitDamageScl": 3,
+                            "powerDamageScl": 2,
+                            "powerSclDecrease": 0,
+                            "timeIncrease": 0,
+                            "timeDuration": 1500,
+                            "radius": 120,
+                            "hitSound": "none",
+                            "hitSoundVolume":4,
+                            "hitSoundPitch": 1.3,
+                            "hitPowerEffect": "none",
+                            "chainEffect": "none",
+                            "applyEffect": "none",
+                            "fragBullets": 3,
+                            "fragLifeMax": 1.2,
+                            "fragLifeMin": 1,
+                            "fragVelocityMax": 1.8,
+                            "fragVelocityMin": 0.5,
+                            "fragOffsetMax": 10,
+                            "fragOffsetMin": 1,
+                            "fragBullet": {
+                                "type": "EmpBulletType",
+                                "speed": 4,
+                                "lifetime": 60,
+                                "drag": 0.05,
+                                "sprite": "circle",
+                                "width": 0,
+                                "height": 0,
+                                "layer": -110.0000000000001,
+                                "frontColor": "F8B591",
+                                "backColor": "F8B591",
+                                "collides": true,
+                                "pierce": true,
+                                "pierceBuilding": true,
+                                "absorbable": false,
+                                "pierceDamageFactor": 0.125,
+                                "removeAfterPierce": false,
+                                "hittable": false,
+                                "pierceArmor": true,
+                                "damage": 15,
+                                "splashDamage": 20,
+                                "splashDamageRadius": 32,
+                                "unitDamageScl": 3,
+                                "powerDamageScl": 2,
+                                "powerSclDecrease": 0,
+                                "timeIncrease": 0,
+                                "timeDuration": 1500,
+                                "radius": 120,
+                                "hitSound": "none",
+                                "hitSoundVolume":2.5,
+                                "hitSoundPitch": 1.3,
+                                "hitPowerEffect": "none",
+                                "chainEffect": "none",
+                                "applyEffect": "none",
+                                "parts": [
+                                    {          
+                                        "type": "ShapePart",
+                                        "color": "F8B591D0",
+                                        "colorTo": "F8B591A8",
+                                        "rotateSpeed": 0,
+                                        "circle": true,
+                                        "hollow": false,
+                                        "radius": 13,
+                                        "radiusTo": 1,
+                                        "layer": 110.0000000000001
+                                    }
+                                ],
+                                "hitEffect": "none",
+                                "despawnEffect": "none", /*{
+                                    "type": "MultiEffect",
+                                    "effects": [
+                                        {
+                                            "type": "ParticleEffect",
+                                            "line": true,
+                                            "particles": 12,
+                                            "length": 40,
+                                            "baseLength": 0,
+                                            "colorFrom": "F8B591",
+                                            "colorTo": "F8B591",
+                                            "strokeFrom": 3,
+                                            "strokeTo": 0,
+                                            "lenFrom": 15,
+                                            "lenTo": 0,
+                                            "lifetime": 15,
+                                            "cone": 20
+                                        },
+                                        {
+                                            "type": "WaveEffect",
+                                            "colorFrom": "F8B591",
+                                            "colorTo": "F8B591",
+                                            "sizeFrom": 0,
+                                            "sizeTo": 32,
+                                            "strokeFrom": 3,
+                                            "strokeTo": 0,
+                                            "lifetime": 15
+                                        }
+                                    ]
+                                },*/
+                            }
+                        }
+                    }
+                ],
+                "fragBullets": 1,
+                "fragOffsetMax": 1,
+                "fragBullet": {
+                    "type": "EmpBulletType",
+                    "applyEffect": "none",
+                    "chainEffect": "none",
+                    "hitPowerEffect": "none",
+                    "timeIncrease": 0,
+		            "powerDamageScl": 0.5,
+                    "unitDamageScl": 10,
+                    "radius": 140,
+                    "pierceArmor": true,
+                    "collidesAir": true,
+                    "absorbable": true,
+                    "splashDamageRadius": 140,
+                    "splashDamage": 73,
+                    "speed": 0,
+                    "lifetime": 0,
+                    "splashDamagePierce": true,
+                    "hitEffect": "none",
+                    "despawnEffect": "none"
+                }
+            },
+            "consumes": 
+            {
+                "remove": "all",
+                "power": 10,
+        		"items": 
+                {
+                    "items": ["phase-fabric/1"],
+                    "booster": true,
+                    "optional": true
+                }
+            },
+            "requirements": ["titanium/150","silicon/130","plastanium/120","surge-alloy/150","phase-fabric/75"]
+        },
+        "overdrive-projector":
+        {
+            "localizedName": "超速投影",
+            "description": "第一代时间加速设备，利用相位织物共振场生成局部时间加速区域。\n通过投射高频相位谐波，定向压缩时空度规，使场内运动、能量与信息处理速度提升。\n\n该装置以标准时空节点为基准，借助时空锚点确保加速可控、可逆，且不与外界时空发生漂移，因此效果无法叠加。\n场边界通过非接触锚定保持稳定，允许物质安全交换。\n\n运行需持续供给相位织物以维持场相干性以及校准标准时空节点；供能中断后，加速场将指数平缓坍缩，避免时空结构损伤",
+            "range": 150,
+            "useTime": 2400,
+            "speedBoost": 2.25,
+            "hasBoost": false,
+            "consumes":
+            {
+                "remove": "all",
+                "power": 5,
+                "items":
+                {
+                    "items": ["phase-fabric/1"]
+                }
+            }
+        },
+        "pulverizer":
+        {
+            "craftTime": 20
+        },
+        "mass-driver":
+        {
+            "range": 520
+        },
+        "force-projector":
+        {
+            "phaseRadiusBoost": 120,
+            "phaseShieldBoost": 800,
+            "coolantConsumption": 0.2,
+            "phaseUseTime": 240,
+            "cooldownLiquid": 2
+        },
+        "copper-wall": {
+            "health": 400
+        },
+        "copper-wall-large": {
+            "health": 1600
+        },
+        "titanium-wall": {
+            "health": 550,
+            "armor": 2
+        },
+        "titanium-wall-large": {
+            "health": 2200,
+            "armor": 2
+        },
+        "plastanium-wall": {
+            "health": 625,
+            "armor": 3
+        },
+        "plastanium-wall-large": {
+            "health": 2500,
+            "armor": 3
+        },
+        "thorium-wall": {
+            "health": 1000,
+            "armor": 5
+        },
+        "thorium-wall-large": {
+            "health": 4000,
+            "armor": 5
+        },
+        "phase-wall": {
+            "armor": 12,
+            "floating": "true"
+        },
+        "phase-wall-large": {
+            "armor": 12,
+            "floating": "true"
+        },
+        "surge-wall": {
+            "health": 1150,
+            "armor": 8
+        },
+        "surge-wall-large": {
+            "health": 4600,
+            "armor": 8
+        },
+        "door": {
+            "health": 500,
+            "armor": 1
+        },
+        "door-large": {
+            "health": 2000,
+            "armor": 1
+        }
+    }
+}

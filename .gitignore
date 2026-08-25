@@ -1,0 +1,23 @@
+# 服务端本体：由安装脚本从官方渠道下载，仓库不带
+/server.jar
+
+# 一键安装脚本的运行时产物
+/.pls/
+*.part
+
+# 服务器运行时数据（误拷入时忽略）
+dumps/
+*.log
+config/saves/
+config/logs/
+config/assetCache/
+config/scripts/cache/
+config/scripts/metadata/
+config/scripts/data/webui/keystore.p12
+config/scripts/data/restart.flag
+config/scripts/data/heartbeat.txt
+config/scripts/data/h2DB*.mv.db
+config/scripts/data/kvStore.mv
+config/scripts/data/users.json
+config/scripts/data/lang_backups/
+_creeper_debug.txt
