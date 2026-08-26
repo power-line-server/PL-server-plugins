@@ -3,6 +3,7 @@
 package coreMindustry
 //WayZer 版权所有(请勿删除版权注解)
 import arc.util.Align
+import cf.wayzer.scriptAgent.listenTo
 import coreMindustry.MenuBuilder
 import coreMindustry.MenuChooseEvent
 import kotlinx.coroutines.Dispatchers
@@ -10,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mindustry.gen.FollowUpMenuCallPacket
+import mindustry.gen.HideFollowUpMenuCallPacket
 import mindustry.gen.MenuCallPacket
 import mindustryX.events.SendPacketEvent
 import java.time.Duration
@@ -51,22 +53,33 @@ val adaptiveWindow by config.key(
     "开启自适应时: 玩家打开服务器菜单后计分板淡出, 在该时长内保持隐藏, 之后自动恢复。",
     "菜单/UI 打开期间计分板会与其抢夺视觉层级, 自适应让计分板在菜单活跃时让位, 避免遮挡。",
 )
-/** 各玩家最近一次收到菜单数据包的时间戳 */
-val lastMenuAt = ConcurrentHashMap<String, Long>()
+/** 各玩家最近一次收到菜单数据包的时间戳与菜单ID: (时间, menuId) */
+val lastMenuAt = ConcurrentHashMap<String, Pair<Long, Int>>()
 
-// 菜单发送时记录时间(逐连接级), 自适应开启的玩家在窗口期内跳过计分板刷新, 2秒后自然淡出让位
+// 菜单发送/隐藏时记录时间(逐连接级), 自适应开启的玩家在窗口期内跳过计分板刷新, 2秒后自然淡出让位
+// 服务端主动隐藏菜单(hideFollowUpMenu)没有客户端回包可依赖, 监听到且 menuId 匹配时立即恢复计分板, 不等满隐藏窗口
 listen<SendPacketEvent> {
     val con = it.con ?: return@listen
-    if (it.packet !is MenuCallPacket && it.packet !is FollowUpMenuCallPacket) return@listen
-    con.player?.uuid()?.let { lastMenuAt[it] = System.currentTimeMillis() }
+    val uuid = con.player?.uuid() ?: return@listen
+    val packet = it.packet
+    when (packet) {
+        is MenuCallPacket -> lastMenuAt[uuid] = System.currentTimeMillis() to packet.menuId
+        is FollowUpMenuCallPacket -> lastMenuAt[uuid] = System.currentTimeMillis() to packet.menuId
+        is HideFollowUpMenuCallPacket -> {
+            val cur = lastMenuAt[uuid] ?: return@listen
+            if (cur.second == packet.menuId) lastMenuAt.remove(uuid)
+        }
+    }
 }
 
 // 玩家选择菜单项后视为菜单可能已关闭: 3秒内没有新菜单包则恢复计分板(不等满隐藏窗口)
-listen<MenuChooseEvent> {
-    val uuid = it.player.uuid()
+// MenuChooseEvent 是 SA 事件(menu.kts 用 launchEmit 发射), 必须用 listenTo 走 SA 事件链;
+// 用 listen 会注册到 arc 事件链永远收不到, 计分板只能等 adaptiveWindow 兜底恢复
+listenTo<MenuChooseEvent> {
+    val uuid = this.player.uuid()
     launch(Dispatchers.Default) {
         delay(3000)
-        val last = lastMenuAt[uuid] ?: return@launch
+        val last = lastMenuAt[uuid]?.first ?: return@launch
         if (System.currentTimeMillis() - last >= 3000) lastMenuAt.remove(uuid)
     }
 }
@@ -140,7 +153,7 @@ onEnable {
                 if (disabled.contains(uuid)) return@forEach
                 // 自适应: 菜单活跃期间跳过刷新, 计分板 2 秒后自然淡出让位
                 if (uuid !in adaptiveOff && adaptiveWindow > 0 &&
-                    System.currentTimeMillis() - (lastMenuAt[uuid] ?: 0L) < adaptiveWindow * 1000L
+                    System.currentTimeMillis() - (lastMenuAt[uuid]?.first ?: 0L) < adaptiveWindow * 1000L
                 ) return@forEach
                 val mobile = it.con?.mobile == true
                 Call.infoPopup(
