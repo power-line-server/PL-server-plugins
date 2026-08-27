@@ -12,8 +12,7 @@ FLAG="config/scripts/data/restart.flag"
 HEART="config/scripts/data/heartbeat.txt"
 # 输出日志文件(外部重定向时存在; 前台终端运行无此文件则跳过 Load Failed 检测)
 OUTLOG="${WATCHDOG_LOG:-watchdog.log}"
-# JVM options mirror run.bat; remove --enable-final-field-mutation on JDK < 24
-JAVA_OPTS="-Djava.net.preferIPv4Stack=true --enable-native-access=ALL-UNNAMED --enable-final-field-mutation=ALL-UNNAMED -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=dumps/ -Xlog:gc*:file=dumps/gc.log:time,uptime,level,tags:filecount=5,filesize=20m -jar server.jar"
+# 启动命令统一由 run.sh 提供(与 run.bat 参数一致, 只维护这一份)
 
 if [ "${1:-}" = "stop" ]; then
     pkill -f "java .*server.jar" 2>/dev/null
@@ -48,9 +47,9 @@ while true; do
     # 交互分支: 后台作业的 stdin 会被 bash 强制改为 /dev/null, 必须显式指向控制终端(/dev/tty),
     # 否则即使在前台终端跑也读不到输入且持续 EOF. 无控制终端时用管道保活.
     if [ -t 0 ] && [ -r /dev/tty ] 2>/dev/null; then
-        java $JAVA_OPTS < /dev/tty &
+        sh run.sh < /dev/tty &
     else
-        tail -f /dev/null | java $JAVA_OPTS &
+        tail -f /dev/null | sh run.sh &
     fi
     PID=$!
 
