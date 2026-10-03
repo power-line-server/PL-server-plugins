@@ -171,11 +171,7 @@ open class MenuV2(
         }
         while (menu.isNotEmpty() && menu.last().isEmpty()) menu.removeLast()
         if (menu.isEmpty()) error("Menu is Empty")
-        val options = menu.map { it.toTypedArray() }.toTypedArray()
-        if (followup)
-            Call.followUpMenu(player.con, _menuId, title, msg, options)
-        else
-            Call.menu(player.con, _menuId, title, msg, options)
+        MenuProtocol.send(player, _menuId, title, msg, menu, followup)
         return this
     }
 
@@ -209,8 +205,7 @@ open class MenuV2(
 
     fun close() {
         closed = true
-        if (!followup) return
-        Call.hideFollowUpMenu(_menuId)
+        MenuProtocol.close(_menuId, followup)
     }
 
     companion object {

@@ -10,6 +10,9 @@ import coreLibrary.lib.util.nextEvent
 import kotlinx.coroutines.withTimeoutOrNull
 import mindustry.gen.Call
 import mindustry.gen.Player
+import mindustry.ui.builder.MenuResult
+import mindustry.ui.builder.UiBuilder
+import mindustry.ui.builder.UiBuilder.NodeBuilder
 import kotlin.random.Random
 
 
@@ -19,6 +22,93 @@ data class MenuChooseEvent(
     override var received: Boolean = false
 
     companion object : Event.Handler()
+}
+
+/**
+ * 160 新菜单协议(MenuBuilder)的传输层。
+ *
+ * 原版 160 起 [mindustry.ui.builder.UiBuilder] + [mindustry.ui.Menus.menuBuilder] 取代了旧的
+ * Call.menu / Call.followUpMenu(官方标记 soft-deprecated)，支持富布局、按玩家下发与实时替换。
+ *
+ * 本层保持 MenuBuilder/MenuV2 的既有语义不变，仅替换传输:
+ *  - 第 i 个可点选项回传 clicked 串 "o<i>"，与 callback 下标一一对应;
+ *  - 玩家关闭/取消 -> MenuResult.wasCancelled() -> 下标 -1;
+ *  - **每次发送生成新 token**: 同 id 菜单被替换时，被替换的旧对话框会回传一个"取消"
+ *    (原版 MenuDialog 的 hidden 回调)，用 token 过滤可避免它误触发新菜单的等待。
+ */
+object MenuProtocol {
+    private const val OPTION_PREFIX = "o"
+
+    /** 与原版旧菜单一致的版式基准(400 宽/50 高/pad 4)，保证迁移后观感不突变 */
+    private const val MENU_WIDTH = 400f
+    private const val BUTTON_HEIGHT = 50f
+    private const val CELL_PAD = 4f
+
+    private class Session(val token: Long, val legacy: Boolean)
+
+    private val sessions = mutableMapOf<Int, Session>()
+
+    /** false 时回退旧 Call.menu 协议(soft-deprecated，仅作应急开关) */
+    var enabled = true
+
+    fun send(player: Player, menuId: Int, title: String, msg: String, options: List<List<String>>, followup: Boolean) {
+        val legacy = !enabled
+        val token = if (legacy) 0L else Random.nextLong()
+        sessions[menuId] = Session(token, legacy)
+        if (legacy) {
+            val opts = options.map { it.toTypedArray() }.toTypedArray()
+            if (followup) Call.followUpMenu(player.con, menuId, title, msg, opts)
+            else Call.menu(player.con, menuId, title, msg, opts)
+        } else {
+            Call.menuBuilder(player.con, menuId, token, title, true, true, false, render(msg, options))
+        }
+    }
+
+    /** 回包是否属于当前这一次发送(旧对话框的迟到回包会被丢弃) */
+    fun accept(menuId: Int, token: Long): Boolean {
+        val s = sessions[menuId] ?: return false
+        return !s.legacy && s.token == token
+    }
+
+    fun optionIndex(result: MenuResult): Int {
+        if (result.wasCancelled()) return -1
+        val raw = result.result ?: return -1
+        if (!raw.startsWith(OPTION_PREFIX)) return -1
+        return raw.substring(OPTION_PREFIX.length).toIntOrNull() ?: -1
+    }
+
+    fun close(menuId: Int, followup: Boolean) {
+        val s = sessions.remove(menuId)
+        if (!followup) return
+        if (s != null && s.legacy) Call.hideFollowUpMenu(menuId) else Call.hideMenuBuilder(menuId)
+    }
+
+    /** 选项网格 -> MenuBuilder 节点树(标题由对话框自带, msg 作为正文标签) */
+    fun render(msg: String, options: List<List<String>>): NodeBuilder<*> {
+        val root = UiBuilder.table()
+        if (msg.isNotEmpty()) {
+            root.add(UiBuilder.label(msg).wrap().width(MENU_WIDTH).align("center").pad(CELL_PAD))
+            root.row()
+        }
+        var index = 0
+        options.forEach { row ->
+            if (row.isEmpty()) return@forEach
+            val count = row.size
+            val full = MENU_WIDTH - (count - 1) * CELL_PAD * 2
+            val each = full / count
+            row.forEachIndexed { i, name ->
+                val idx = index++
+                val w = if (i == count - 1) full - each * (count - 1) else each
+                if (name.isEmpty()) {
+                    root.add(UiBuilder.space().width(w).height(BUTTON_HEIGHT).pad(CELL_PAD))
+                } else {
+                    root.add(UiBuilder.button(name).clicked(OPTION_PREFIX + idx).width(w).height(BUTTON_HEIGHT).pad(CELL_PAD))
+                }
+            }
+            root.row()
+        }
+        return root
+    }
 }
 
 @Suppress("unused", "MemberVisibilityCanBePrivate")
@@ -122,11 +212,7 @@ open class MenuBuilder<T : Any>(
 
         try {
             return withTimeoutOrNull(timeoutMillis.toLong()) {
-                val options = menu.map { it.toTypedArray() }.toTypedArray()
-                if (followup)
-                    Call.followUpMenu(player.con, _menuId, title, msg, options)
-                else
-                    Call.menu(player.con, _menuId, title, msg, options)
+                MenuProtocol.send(player, _menuId, title, msg, menu, followup)
                 //原版返回值，代表选中n个选项，可能 -1 代表主动关闭
                 val ret = MenuBuilder::class.java.getContextScript().nextEvent<MenuChooseEvent> {
                     it.player == player && it.menuId == _menuId
@@ -147,8 +233,7 @@ open class MenuBuilder<T : Any>(
     }
 
     fun close() {
-        if (!followup) return
-        Call.hideFollowUpMenu(_menuId)
+        MenuProtocol.close(_menuId, followup)
     }
 }
 
