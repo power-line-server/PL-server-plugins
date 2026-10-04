@@ -1,1 +1,10 @@
-本仓库版权延续上游仓库https://github.com/way-zer/ScriptAgent4MindustryExt
+本仓库版权延续上游仓库 ScriptAgent4MindustryExt
+上游仓库：https://github.com/way-zer/ScriptAgent4MindustryExt
+
+本仓库（含加载器引用、脚本与二次开发/整合内容）的版权与许可口径均延续上游仓库，
+具体以上游仓库 README 的"版权说明"为准：
+  - 加载器：免费使用，未经许可禁止转载和用作其他用途
+  - 脚本：默认允许私人修改并使用，但禁止修改原作者版权信息，公开使用需注明出处（fork 或引用该仓库）
+  - 其他脚本：归脚本作者所有，作者可自行声明开源协议，不受加载器版权影响
+
+引用、修改与再分发本仓库内容时，请一并遵守上游仓库及其中各组件的许可声明。
