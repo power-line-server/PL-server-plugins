@@ -3,7 +3,7 @@
 # OneKeyInstall.sh — 一键安装 PL-server-plugins（Linux / Termux）
 # 会做的事：
 #   1. 安装 git（系统包管理器，apt/dnf/yum/pacman/apk/zypper/pkg）
-#   2. 下载便携 JDK26 到 ~/.pls/jdk（免 root，Adoptium 发行）
+#   2. 下载便携 JDK27 到 ~/.pls/jdk（免 root，Oracle 官方直链）
 #   3. 克隆本仓库到 ~/PL-server-plugins
 #   4. 从 MindustyX 最新发行版下载 server 文件，改名 server.jar
 #   5. 下载 Mindust 源码到 ~/mindustrySourceDir
@@ -34,8 +34,8 @@ MIRRORS=(
   "https://mirror.ghproxy.com/https://github.com"
   "https://ghproxy.cc/https://github.com"
 )
-# Oracle JDK26 官方直链（latest 目录固定文件名，按架构拼）
-ORACLE_JDK="https://download.oracle.com/java/26/latest"
+# Oracle JDK27 官方直链（latest 目录固定文件名，按架构拼；2026-10 实测 linux-x64/aarch64 均 200）
+ORACLE_JDK="https://download.oracle.com/java/27/latest"
 
 log()  { printf '\033[1;36m[PLS]\033[0m %s\n' "$*"; }
 die()  { printf '\033[1;31m[PLS]\033[0m %s\n' "$*" >&2; exit 1; }
@@ -66,9 +66,9 @@ dl() {  # dl <url> <输出文件> [重试次数]
   return 1
 }
 
-has_java26() {
+has_java27() {
   local j="$JDK_DIR/bin/java"
-  [ -x "$j" ] && "$j" -version 2>&1 | grep -q '"26\.'
+  [ -x "$j" ] && "$j" -version 2>&1 | grep -q '"27\.'
 }
 has_git() { command -v git >/dev/null 2>&1; }
 
@@ -98,9 +98,9 @@ else
   fi
 fi
 
-# ---------- 2. JDK26（便携，免 root） ----------
-if ! has_java26 || [ "$FORCE" = 1 ]; then
-  log "下载便携 JDK26 到 $JDK_DIR ..."
+# ---------- 2. JDK27（便携，免 root） ----------
+if ! has_java27 || [ "$FORCE" = 1 ]; then
+  log "下载便携 JDK27 到 $JDK_DIR ..."
   rm -rf "$JDK_DIR" "${JDK_DIR}.part"
   arch=$(uname -m)
   case "$arch" in
@@ -108,15 +108,15 @@ if ! has_java26 || [ "$FORCE" = 1 ]; then
     aarch64|arm64) jarch="aarch64" ;;
     *) die "不支持的架构: $arch" ;;
   esac
-  jurls=("$ORACLE_JDK/jdk-26_linux-${jarch}_bin.tar.gz")
+  jurls=("$ORACLE_JDK/jdk-27_linux-${jarch}_bin.tar.gz")
   jfast=$(pick_fastest "${jurls[@]}")
-  dl "$jfast" "$PLSDIR/jdk.tar.gz" || die "JDK 下载失败。可手动把 JDK26 解压到 ~/.pls/jdk 后重跑"
+  dl "$jfast" "$PLSDIR/jdk.tar.gz" || die "JDK 下载失败。可手动把 JDK27 解压到 ~/.pls/jdk 后重跑"
   mkdir -p "$JDK_DIR.part"
   tar -xzf "$PLSDIR/jdk.tar.gz" -C "$JDK_DIR.part" --strip-components=1 || die "JDK 解压失败"
   rm -f "$PLSDIR/jdk.tar.gz"
   mv "$JDK_DIR.part" "$JDK_DIR"
 else
-  log "JDK26 已就绪: $JDK_DIR"
+  log "JDK27 已就绪: $JDK_DIR"
 fi
 JAVA="$JDK_DIR/bin/java"
 "$JAVA" -version >/dev/null 2>&1 || die "JDK 不可用: $JAVA"

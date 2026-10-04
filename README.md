@@ -1,6 +1,6 @@
 # PL-server-plugins
 
-基于[微泽插件3.4.0](https://github.com/way-zer/ScriptAgent4MindustryExt/releases/tag/v3.4.0)开发的 Mindustry 服务器插件。
+基于[微泽插件3.4.0](https://github.com/way-zer/ScriptAgent4MindustryExt/releases/tag/v3.4.0)开发的 Mindustry 服务器插件，当前适配 **Mindustry 160.5 + MindustryX 2026.10.02.B502**。
 
 本插件大量使用AI制作，依旧感谢D老师神力。
 
@@ -8,7 +8,7 @@
 
 我们的Discord服务器：https://discord.gg/g7VSe4f9PV
 
-这是一个开箱即用的服务器整合包：插件脚本、WebUI 管理后台、一键安装脚本、Windows/Linux 守护进程都有。装好 JDK 和游戏服务端就能跑。
+这是一个开箱即用的服务器整合包：插件脚本、WebUI 管理后台、一键安装脚本、Windows/Linux 守护进程都有。装好 JDK 27 和游戏服务端就能跑。
 
 ## 快速开始
 
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/power-line-server/PL-server-plugins
 脚本会依次做这几件事，每步都幂等，中途 Ctrl-C、断网、重新运行都不会搞坏，已完成的部分会自动跳过：
 
 1. 装 git（Linux 用系统包管理器，Windows 用 winget）
-2. 下载便携 JDK26 到 `~/.pls/jdk`（Linux）或 `.\pls\jdk`（Windows），免 root 免安装
+2. 下载便携 JDK27 到 `~/.pls/jdk`（Linux）或 `.\pls\jdk`（Windows），免 root 免安装
 3. 克隆本仓库（Linux 放 `~/PL-server-plugins`，Windows 放当前目录下的 `PL-server-plugins`）
 4. 从 [MindustryX](https://github.com/TinyLake/MindustryX) 最新发行版下载 server 文件，改名 `server.jar`
 5. 下载 [Mindustry 游戏源码](https://github.com/Anuken/Mindustry) 到 `~/mindustrySourceDir`（或当前目录下同名文件夹）
@@ -41,7 +41,7 @@ GitHub 下载会先对所有镜像站（ghfast.top、gh-proxy.com、ghproxy.net 
 
 ### 手动安装
 
-1. 安装 JDK26：[Oracle 官网](https://www.oracle.com/java/technologies/downloads/) 或任意发行版
+1. 安装 JDK27：[Oracle 官网](https://www.oracle.com/java/technologies/downloads/) 或任意发行版
 2. 安装 git：[Windows 下载](https://git-scm.com/download/win)，Linux 直接 `sudo apt install git`（或对应包管理器）
 3. `git clone https://github.com/power-line-server/PL-server-plugins.git`
 4. 下载 [MindustryX 最新发行版](https://github.com/TinyLake/MindustryX/releases) 的 server 文件，重命名为 `server.jar` 放进仓库目录

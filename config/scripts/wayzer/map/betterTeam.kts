@@ -44,10 +44,28 @@ val allTeam: Set<Team>
 
 var bannedTeam = emptySet<Team>()
 
+// 并发连入修正: 开服/换图瞬间多人同时连入时, 每个玩家被分配队伍的那一刻 Groups.player 仍是空的
+// (实测 8 人同时连入时 8 次分配全部 groups=0), 若只按 Groups.player 均分, 每人看到的都是"全 0"而各自随机,
+// 结果会明显偏向某一队。这里把"已分配但尚未加入 Groups.player"的玩家一并计入分配基数。
+// 注意: 不能用 con.isConnected 判断(实测该标志在分配时已为 true, 但玩家要到之后才被 add),
+// 会把这些玩家当场剔除而完全失效; 判定依据是 isAdded。
+val connectingPlayers = mutableListOf<Player>()
+
+fun checkConnectingPlayers(): List<Player> {
+    // 已真正加入 Groups.player 的不再重复计入(否则会双倍计数), 连接对象消失的清掉
+    connectingPlayers.removeAll { it.con == null || it.isAdded }
+    return connectingPlayers
+}
+
 onEnable {
     val backup = netServer.assigner
     netServer.assigner = NetServer.TeamAssigner { p, g ->
-        randomTeam(p, g)
+        // 只修正默认分组(连接分配)的基数; 显式传入的分组(如换图时的 WorldReloader)保持原样
+        val group = if (g == Groups.player) {
+            if (!p.isAdded) connectingPlayers.add(p)
+            checkConnectingPlayers() + g
+        } else g
+        randomTeam(p, group)
     }
     onDisable { netServer.assigner = backup }
     updateBannedTeam(true)
@@ -59,6 +77,7 @@ val forcedTeams = mutableMapOf<String, Team>()
 listen<EventType.ResetEvent> {
     bannedTeam = emptySet()
     forcedTeams.clear()
+    connectingPlayers.clear()
 }
 // 与原版一致: PVP 图单人时自动暂停等待玩家加入(NetServer.isWaitingForPlayers 依赖 rules.pvp)
 // 地图文件 rules 通常不含 pvp 字段, 且回档时 readRules 会用存档 rules 覆盖, 故在加载完成时按 mode 补齐
@@ -67,7 +86,10 @@ listen<MapLoadCompleteEvent> {
         state.rules.pvp = true
     }
 }
-listen<EventType.PlayerLeave> { forcedTeams.remove(it.player.uuid()) }
+listen<EventType.PlayerLeave> {
+    forcedTeams.remove(it.player.uuid())
+    connectingPlayers.remove(it.player)
+}
 
 listen<EventType.BlockDestroyEvent> { e ->
     if (state.gameOver) return@listen

@@ -19,7 +19,7 @@ val fallbackMap by config.key(
 
 var console by config.key("@raw", "控制台语言(不发给玩家的语句)")
 
-val mindustrySourceDir by config.key("", "Mindustry 源码目录路径（指向包含 core/ 的顶层目录，如 ../Mindustry-159.6 或 D:/Mindustry-159.7）。留空则回退到 Vars.tree")
+val mindustrySourceDir by config.key("", "Mindustry 源码目录路径（指向包含 core/ 的顶层目录，如 ../Mindustry-160.5）。留空则回退到 Vars.tree")
 
 fun fallbackLang(lang: String): String {
     return (fallbackMap[lang] ?: fallbackMap["*"] ?: "@raw")

@@ -2335,10 +2335,13 @@ private fun handleI18nLangs(exchange: HttpExchange) {
 // GET /api/i18n?lang=zh_CN
 // A1: 从 LangService.getBundleData() 读取翻译（数据来自 .properties 语言包）
 // bundleData 结构: key -> (langCode -> translation)，返回请求语言的完整翻译表（含 zh_CN fallback）
+// 只下发前端实际使用的 webui.* 前缀（前端全部引用键都在该命名空间），
+// 避免把整包 2122 个键(约 152KB)全部传给浏览器
 private fun handleI18n(exchange: HttpExchange, lang: String) {
     val data = JSONObject()
     val bundles = langApi.getBundleMap()
     bundles.forEach { (key, translations) ->
+        if (!key.startsWith("webui.")) return@forEach
         val text = translations[lang] ?: translations["zh_CN"] ?: translations["en"]
         if (text != null) {
             data.put(key, text)
@@ -2553,23 +2556,30 @@ onEnable {
     // 内容图标懒加载：Core.atlas 在 onEnable 时未初始化，改为首次请求 /api/content-icon/ 时触发
     if (webuiEnabled) {
         startServer()
-        // C1: 游戏线程定时更新状态快照（HTTP 线程直接读取，避免 runBlocking 阻塞）
-        loop(Dispatchers.game) {
+        // C1: 定时更新状态快照（HTTP 线程直接读取，避免 runBlocking 阻塞）
+        // 循环必须跑在 Default: 它含 delay, 挂在 game 调度器上时, 关服 disableAll() 在主线程
+        // runBlocking 等待取消, 而取消续体又需主线程调度 -> 死锁(3s 超时后服务器挂起)。
+        // 仅"读游戏数据"这一步切回 game。
+        loop(Dispatchers.Default) {
             try {
-                statusSnapshot = buildStatusSnapshot()
+                withContext(Dispatchers.game) {
+                    statusSnapshot = buildStatusSnapshot()
+                }
             } catch (e: Exception) {
                 logger.warning("WebUI 状态快照更新失败: ${e.message}")
             }
             delay(statusSnapshotIntervalMs.toLong())
         }
         // C7: 预初始化内容图标（延迟 10 秒等待游戏资源加载完成，保留懒加载兜底）
-        launch(Dispatchers.game) {
+        launch(Dispatchers.Default) {
             delay(10000)
-            if (!contentIconsInitialized) {
-                synchronized(contentIconLock) {
-                    if (!contentIconsInitialized) {
-                        initContentIcons()
-                        contentIconsInitialized = true
+            withContext(Dispatchers.game) {
+                if (!contentIconsInitialized) {
+                    synchronized(contentIconLock) {
+                        if (!contentIconsInitialized) {
+                            initContentIcons()
+                            contentIconsInitialized = true
+                        }
                     }
                 }
             }

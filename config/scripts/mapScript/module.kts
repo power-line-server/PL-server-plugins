@@ -15,7 +15,7 @@ import wayzer.MapRegistry
 
 val children get() = ScriptRegistry.allScripts { it != scriptInfo && it.dependsOn(scriptInfo) }
 
-/** transactionV2 容错: 事件处理期间外层事务(如启动 boot)未结束时调用会报 Nest Transaction 嵌套错误(JDK26 下脚本加载慢更易触发)。
+/** transactionV2 容错: 事件处理期间外层事务(如启动 boot)未结束时调用会报 Nest Transaction 嵌套错误(JDK27 下脚本加载慢更易触发)。
  *  捕获后通过 afterTransaction 等外层事务结束再重试, 保持地图脚本加载/卸载语义。
  *  注: ScriptManager.transactionV2 的签名是 block: suspend TransactionV2.() -> Unit, 返回 SATransaction(事务对象)。 */
 private suspend fun transactionV2Safe(block: suspend ScriptManager.TransactionV2.() -> Unit): cf.wayzer.scriptAgent.state.SATransaction? {

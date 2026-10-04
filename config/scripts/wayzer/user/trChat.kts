@@ -81,6 +81,35 @@ data class TrConfig(
     var reasoningEffort: String = "none"
 ) {
     fun toProviderConfig() = ProviderConfig(type, baseUrl, apiKey, model)
+
+    /**
+     * 真正发请求时使用的凭据。
+     *
+     * 免费API模式必须**在请求时**从 config.conf 的 freeApi* 解析, 绝不能把服主密钥写进玩家配置:
+     * 旧实现在切换开关时把 freeApiBaseUrl/freeApiApiKey/freeApiModel 复制进玩家配置并持久化,
+     * 玩家关掉免费API后打开"设置API Key"即可在输入框里读走服主密钥。
+     */
+    fun effectiveProviderConfig(): ProviderConfig = if (useFreeApi) ProviderConfig(
+        type = try { ProviderType.valueOf(freeApiType.uppercase()) } catch (e: Exception) { ProviderType.OPENAI },
+        baseUrl = freeApiBaseUrl,
+        apiKey = freeApiApiKey,
+        model = freeApiModel,
+    ) else toProviderConfig()
+}
+
+/**
+ * 玩家自定义 baseUrl 的安全校验: 仅允许 http(s), 且目标不得是回环/内网/链路本地/组播地址。
+ * 玩家可自行填写 API 地址 = 服务器代替玩家向该地址发请求, 不加限制即构成 SSRF
+ * (可探测内网服务、云元数据 169.254.169.254 等)。本服 WebUI 也在 127.0.0.1 上, 必须挡。
+ */
+fun isSafeApiBaseUrl(raw: String): Boolean {
+    val url = raw.trim()
+    if (!url.startsWith("http://", true) && !url.startsWith("https://", true)) return false
+    val host = runCatching { java.net.URI(url).host }.getOrNull() ?: return false
+    if (host.isBlank()) return false
+    val addr = runCatching { java.net.InetAddress.getByName(host) }.getOrNull() ?: return false
+    return !(addr.isAnyLocalAddress || addr.isLoopbackAddress || addr.isLinkLocalAddress
+        || addr.isSiteLocalAddress || addr.isMulticastAddress)
 }
 
 fun getTrConfig(uuid: String): TrConfig {
@@ -132,7 +161,7 @@ fun getOrCreateContext(uuid: String): MutableList<JSONObject> =
     trContexts.computeIfAbsent(uuid) { CopyOnWriteArrayList() }
 
 fun isApiReady(cfg: TrConfig): Boolean {
-    val c = cfg.toProviderConfig()
+    val c = cfg.effectiveProviderConfig()
     return c.baseUrl.isNotBlank() && c.apiKey.isNotBlank() && c.model.isNotBlank()
 }
 
@@ -323,7 +352,7 @@ suspend fun callTranslateApi(
         reasoningEffort = effEffort
     )
 
-    val result = generate(cfg.toProviderConfig(), messages.toList(), params, effTimeout * 1000)
+    val result = generate(cfg.effectiveProviderConfig(), messages.toList(), params, effTimeout * 1000)
 
     if (result == null) return null
 
@@ -478,6 +507,11 @@ fun apiSettingsMenu(p: Player) {
             launch {
                 val url = textInput(p, "{tr trChat.input.setBaseUrl.title}".with("receiver" to p).toString(), "{tr trChat.input.setBaseUrl.hint}".with("receiver" to p).toString(), cfg.baseUrl, 200)
                 if (url != null) {
+                    if (!isSafeApiBaseUrl(url)) {
+                        p.sendMessage("{tr trChat.reply.baseUrlRejected}".with("receiver" to p))
+                        apiSettingsMenu(p)
+                        return@launch
+                    }
                     cfg.baseUrl = url
                     saveTrConfig(uuid, cfg)
                     p.sendMessage("{tr trChat.reply.baseUrlUpdated}".with("receiver" to p))
@@ -592,12 +626,13 @@ fun apiSettingsMenu(p: Player) {
             option("$freeApiStatus {tr trChat.option.useFreeApi}".with("receiver" to p).toString()) {
                 if (cfg.useFreeApi) {
                     cfg.useFreeApi = false
+                    // 清理历史版本遗留在玩家配置里的服主凭据(旧实现会复制过来), 否则仍会在"设置API Key"输入框里回显
+                    if (cfg.apiKey == freeApiApiKey) cfg.apiKey = ""
+                    if (cfg.baseUrl == freeApiBaseUrl) cfg.baseUrl = ""
+                    if (cfg.model == freeApiModel) cfg.model = ""
                 } else {
+                    // 只记录开关本身; 凭据一律在请求时由 effectiveProviderConfig() 从 config.conf 解析
                     cfg.useFreeApi = true
-                    cfg.type = try { ProviderType.valueOf(freeApiType.uppercase()) } catch (e: Exception) { ProviderType.OPENAI }
-                    cfg.baseUrl = freeApiBaseUrl
-                    cfg.apiKey = freeApiApiKey
-                    cfg.model = freeApiModel
                     cfg.langFilter = true  // 使用免费API时强制语言过滤
                 }
                 saveTrConfig(uuid, cfg)

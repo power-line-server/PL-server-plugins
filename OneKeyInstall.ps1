@@ -2,9 +2,9 @@
 # OneKeyInstall.ps1 — Windows 一键安装 PL-server-plugins
 # 会做的事（与 OneKeyInstall.sh 一致）：
 #   1. 检测/安装 git（winget 装 Git for Windows）
-#   2. 下载便携 JDK26 到 .\pls\jdk（Oracle 官方直链，免安装）
+#   2. 下载便携 JDK27 到 .\pls\jdk（Oracle 官方直链，免安装）
 #   3. 克隆本仓库到当前目录\PL-server-plugins
-#   4. 从 MindustxX 最新发行版下载 server 文件，改名 server.jar
+#   4. 从 MindustryX 最新发行版下载 server 文件，改名 server.jar
 #   5. 下载 Mindust 源码到当前目录\mindustrySourceDir
 #   6. 把 config.conf 的 mindustrySourceDir 指向它
 # 之后运行 PL-server-plugins\run.bat 即可开服。
@@ -32,7 +32,7 @@ $Mirrors = @(
   'https://mirror.ghproxy.com/https://github.com'
   'https://ghproxy.cc/https://github.com'
 )
-$OracleJdk = 'https://download.oracle.com/java/26/latest'
+$OracleJdk = 'https://download.oracle.com/java/27/latest'
 
 function Log  { Write-Host "[PLS] $args" -ForegroundColor Cyan }
 function Die  { Write-Host "[PLS] $args" -ForegroundColor Red; exit 1 }
@@ -79,11 +79,11 @@ function Download([string]$Url, [string]$Out, [int]$Tries = 3) {
   throw "下载失败: $Url"
 }
 
-function Has-Java26 {
+function Has-Java27 {
   $j = Join-Path $JdkDir 'bin\java.exe'
   if (-not (Test-Path $j)) { return $false }
   $v = & $j -version 2>&1 | Out-String
-  return $v -match '"26\.'
+  return $v -match '"27\.'
 }
 
 New-Item -ItemType Directory -Force -Path $PlsDir | Out-Null
@@ -103,23 +103,23 @@ if (Get-Command git -ErrorAction SilentlyContinue) {
   }
 }
 
-# ---------- 2. JDK26 便携 ----------
-if (-not (Has-Java26) -or $Force) {
-  Log "下载便携 JDK26 到 $JdkDir ..."
+# ---------- 2. JDK27 便携 ----------
+if (-not (Has-Java27) -or $Force) {
+  Log "下载便携 JDK27 到 $JdkDir ..."
   if (Test-Path $JdkDir) { Remove-Item -Recurse -Force $JdkDir }
-  $arch = if ($env:PROCESSOR_ARCHITECTURE -match 'ARM') { 'aarch64' } else { 'x64' }
-  $prod = if ($env:PROCESSOR_ARCHITECTURE -match 'ARM') { 'aarch64' } else { 'x64' }
-  $jUrl = "$OracleJdk/jdk-26_windows-$prod.zip"
+  # Oracle 不提供 Windows ARM64 版 JDK(2026-10 实测 jdk-27_windows-aarch64_bin.zip 是 404),
+  # Windows on ARM 直接用系统自带的 x64 模拟跑 x64 版即可, 所以固定 x64
+  $jUrl = "$OracleJdk/jdk-27_windows-x64_bin.zip"
   Download $jUrl (Join-Path $PlsDir 'jdk.zip')
   Log '  解压 JDK ...'
   Expand-Archive -Force (Join-Path $PlsDir 'jdk.zip') $PlsDir
   Remove-Item (Join-Path $PlsDir 'jdk.zip')
-  # 解压出来是 jdk-26.x.y 一层目录，剥掉
-  $inner = Get-ChildItem $PlsDir -Directory | Where-Object { $_.Name -like 'jdk-26*' } | Select-Object -First 1
-  if (-not $inner) { Die 'JDK 解压结构不对，请手动解压 JDK26 到 .\pls\jdk 后重跑' }
+  # 解压出来是 jdk-27.x.y 一层目录，剥掉
+  $inner = Get-ChildItem $PlsDir -Directory | Where-Object { $_.Name -like 'jdk-27*' } | Select-Object -First 1
+  if (-not $inner) { Die 'JDK 解压结构不对，请手动解压 JDK27 到 .\pls\jdk 后重跑' }
   Move-Item $inner.FullName $JdkDir
 } else {
-  Log "JDK26 已就绪: $JdkDir"
+  Log "JDK27 已就绪: $JdkDir"
 }
 $java = Join-Path $JdkDir 'bin\java.exe'
 if (-not (Test-Path $java)) { Die "JDK 不可用: $java" }

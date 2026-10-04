@@ -48,6 +48,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.random.Random
+import kotlinx.coroutines.withContext
 
 
 /**@author xkldklp
@@ -632,8 +633,10 @@ class MegaStructures(
             Items.lead to 80000
         ), fun Team.() {
             techData().techPoint += 2
-            loop(Dispatchers.game) {
-                techData().exp += techData().level * if (techData().quickTech) 60 else 40
+            loop(Dispatchers.Default) {
+                withContext(Dispatchers.game) {
+                    techData().exp += techData().level * if (techData().quickTech) 60 else 40
+                }
                 delay(1000L)
             }
         }),
@@ -656,8 +659,10 @@ class MegaStructures(
             Items.lead to 80000
         ),
         fun Team.() {
-            loop(Dispatchers.game) {
-                addCoin(6 * max((Time.timeSinceMillis(startTime) / 1000 / 60 / 3).toInt(), 1) * 5)
+            loop(Dispatchers.Default) {
+                withContext(Dispatchers.game) {
+                    addCoin(6 * max((Time.timeSinceMillis(startTime) / 1000 / 60 / 3).toInt(), 1) * 5)
+                }
                 delay(1000L)
             }
         },
@@ -674,21 +679,23 @@ class MegaStructures(
         fun Team.() {
             val team = this
             techData().techPoint += 10
-            launch(Dispatchers.game) {
+            launch(Dispatchers.Default) {
                 delay(300_000L)
-                data().players.filter { it.team() == team }.forEach {
-                    it.removeCoin(it.coins())
+                withContext(Dispatchers.game) {
+                    data().players.filter { it.team() == team }.forEach {
+                        it.removeCoin(it.coins())
+                    }
+                    data().cores.forEach {
+                        it.removeCoin(it.coins())
+                        it.cityData().cityType = CityTypes.Void
+                    }
+                    data().units.forEach {
+                        if (Random.nextFloat() < 0.25f) Call.label("[navy]虚寂！", 3f, it.x, it.y)
+                        Call.effect(Fx.reactorExplosion, it.x, it.y, 0f, color)
+                        it.kill()
+                    }
+                    removeCoin(coins())
                 }
-                data().cores.forEach {
-                    it.removeCoin(it.coins())
-                    it.cityData().cityType = CityTypes.Void
-                }
-                data().units.forEach {
-                    if (Random.nextFloat() < 0.25f) Call.label("[navy]虚寂！", 3f, it.x, it.y)
-                    Call.effect(Fx.reactorExplosion, it.x, it.y, 0f, color)
-                    it.kill()
-                }
-                removeCoin(coins())
             }
         },
         fun Team.(): Boolean {
@@ -704,11 +711,13 @@ class MegaStructures(
         ),
         fun Team.() {
             val team = this
-            loop(Dispatchers.game) {
-                Groups.player.filter { it.team() != team && !it.dead() }.randomOrNull()?.apply {
-                    unit().health -= (5000 - unit().armor * 50f).coerceAtLeast(1f)
-                    sendMessage("[red]哦不..你被上帝权杖击中!")
-                    Call.label(listOf("啪", "嘣", "叮", "当", "咚", "咔", "嘭", "砰").random(), 2f, x, y)
+            loop(Dispatchers.Default) {
+                withContext(Dispatchers.game) {
+                    Groups.player.filter { it.team() != team && !it.dead() }.randomOrNull()?.apply {
+                        unit().health -= (5000 - unit().armor * 50f).coerceAtLeast(1f)
+                        sendMessage("[red]哦不..你被上帝权杖击中!")
+                        Call.label(listOf("啪", "嘣", "叮", "当", "咚", "咔", "嘭", "砰").random(), 2f, x, y)
+                    }
                 }
                 delay(5_000L)
             }
@@ -846,155 +855,166 @@ fun Player.createLordUnit(core: CoreBuild, unitType: UnitType? = lordUnitType(),
                 return false
             }
         }
-        launch(Dispatchers.game) {
-            unitOwner[unit] = uuid()
-            lordUnit(unit)
+        launch(Dispatchers.Default) {
+            withContext(Dispatchers.game) {
+                unitOwner[unit] = uuid()
+                lordUnit(unit)
+            }
             var spawnTime = Time.millis()
-            while (Time.timeSinceMillis(spawnTime) / 1000f <= 120f * team.techData().lordUnitSpawnTimeMultiplier) {
-                Call.label(
-                    "${unit.type.emoji()}[#${team().color}]领主级单位降临[white]${unit.type.emoji()}${if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team()) "  [red]被打断！[white]" else ""}\n$name [white]${
-                        (120f * team.techData().lordUnitSpawnTimeMultiplier - Time.timeSinceMillis(
-                            spawnTime
-                        ) / 1000f).format()
-                    }", 0.2026f, x, y
-                )
-                if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team())
-                    Call.effect(Fx.unitEnvKill, x, y, 0f, team().color)
-                else {
-                    Call.effect(Fx.spawnShockwave, x, y, 0f, team().color)
-                    repeat((team.techData().lordUnitExplosionMultiplier * 1.5f).toInt()) {
-                        Tmp.v1.rnd(Random.nextFloat() * 48f * 8f * team.techData().lordUnitExplosionMultiplier)
-                        val sx = x + Tmp.v1.x
-                        val sy = y + Tmp.v1.y
-                        Call.effect(Fx.unitCapKill, sx, sy, 0f, team().color)
-                    }
-                }
-                if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team())
-                    spawnTime += 1200
-                if (120f * team.techData().lordUnitSpawnTimeMultiplier - Time.timeSinceMillis(spawnTime) / 1000f >= 120f * team.techData().lordUnitSpawnTimeMultiplier * 1.5f) {
-                    sendMessage("[red]领主降临被强制打断！")
-                    Call.announce(
-                        con(),
-                        "[red]领主降临被强制打断！\n[cyan]冷却时间已经返还\n[#${team().color}]${Iconc.blockCliff}${cost * 3 / 4}[cyan]已经返还"
+            while (withContext(Dispatchers.game) { Time.timeSinceMillis(spawnTime) / 1000f <= 120f * team.techData().lordUnitSpawnTimeMultiplier }) {
+                val interrupted = withContext(Dispatchers.game) {
+                    Call.label(
+                        "${unit.type.emoji()}[#${team().color}]领主级单位降临[white]${unit.type.emoji()}${if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team()) "  [red]被打断！[white]" else ""}\n$name [white]${
+                            (120f * team.techData().lordUnitSpawnTimeMultiplier - Time.timeSinceMillis(
+                                spawnTime
+                            ) / 1000f).format()
+                        }", 0.2026f, x, y
                     )
-                    achievement("[green][放个屁都能被打断]", 50)
-                    setLordCooldown(0f)
-                    addCoin(cost * 3 / 4)
-                    lordUnit(null)
-                    return@launch
+                    if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team())
+                        Call.effect(Fx.unitEnvKill, x, y, 0f, team().color)
+                    else {
+                        Call.effect(Fx.spawnShockwave, x, y, 0f, team().color)
+                        repeat((team.techData().lordUnitExplosionMultiplier * 1.5f).toInt()) {
+                            Tmp.v1.rnd(Random.nextFloat() * 48f * 8f * team.techData().lordUnitExplosionMultiplier)
+                            val sx = x + Tmp.v1.x
+                            val sy = y + Tmp.v1.y
+                            Call.effect(Fx.unitCapKill, sx, sy, 0f, team().color)
+                        }
+                    }
+                    if (core.tile.build !is CoreBuild || core.tile.build.team != this@createLordUnit.team())
+                        spawnTime += 1200
+                    if (120f * team.techData().lordUnitSpawnTimeMultiplier - Time.timeSinceMillis(spawnTime) / 1000f >= 120f * team.techData().lordUnitSpawnTimeMultiplier * 1.5f) {
+                        sendMessage("[red]领主降临被强制打断！")
+                        Call.announce(
+                            con(),
+                            "[red]领主降临被强制打断！\n[cyan]冷却时间已经返还\n[#${team().color}]${Iconc.blockCliff}${cost * 3 / 4}[cyan]已经返还"
+                        )
+                        achievement("[green][放个屁都能被打断]", 50)
+                        setLordCooldown(0f)
+                        addCoin(cost * 3 / 4)
+                        lordUnit(null)
+                        true
+                    } else false
                 }
+                if (interrupted) return@launch
                 delay(200)
             }
-            apply(StatusEffects.boss, Float.MAX_VALUE)
-            apply(StatusEffects.overdrive, Float.MAX_VALUE)
-            apply(StatusEffects.overclock, Float.MAX_VALUE)
-            apply(StatusEffects.shielded, Float.MAX_VALUE)
-            if (unit.team().techData().cycloneEngine)
-                apply(StatusEffects.fast, Float.MAX_VALUE)
-            apply(StatusEffects.invincible, team.techData().lordUnitSpawnInvincibleTime * 60f)
-            maxHealth *= team.techData().lordUnitHealthMultiplier
-            health = maxHealth
-            add()
-            unit(unit)
-            achievement("[green][放了个屁]", 50)
-            Call.announce("$name [#${team().color}]领主级单位\n!${unit.type.emoji()}出征${unit.type.emoji()}!")
-            Call.sendMessage("$name [#${team().color}]领主级单位${unit.type.emoji()}出征${unit.type.emoji()}!")
-            Call.logicExplosion(
-                team,
-                x,
-                y,
-                40f * 8f * team.techData().lordUnitExplosionMultiplier,
-                7500f * team.techData().lordUnitExplosionMultiplier,
-                true,
-                true,
-                true,
-                false
-            )
-            Call.soundAt(Sounds.wind3, x, y, 114514f, 0f)
-            Call.effect(Fx.impactReactorExplosion, x, y, 0f, team().color)
-            if (team.techData().buffedLords) {
-                when (unit.type) {
-                    UnitTypes.toxopid -> {
-                        repeat(16) {
-                            createUnit(unit, UnitTypes.arkyid)
+            withContext(Dispatchers.game) {
+                apply(StatusEffects.boss, Float.MAX_VALUE)
+                apply(StatusEffects.overdrive, Float.MAX_VALUE)
+                apply(StatusEffects.overclock, Float.MAX_VALUE)
+                apply(StatusEffects.shielded, Float.MAX_VALUE)
+                if (unit.team().techData().cycloneEngine)
+                    apply(StatusEffects.fast, Float.MAX_VALUE)
+                apply(StatusEffects.invincible, team.techData().lordUnitSpawnInvincibleTime * 60f)
+                maxHealth *= team.techData().lordUnitHealthMultiplier
+                health = maxHealth
+                add()
+                unit(unit)
+                achievement("[green][放了个屁]", 50)
+                Call.announce("$name [#${team().color}]领主级单位\n!${unit.type.emoji()}出征${unit.type.emoji()}!")
+                Call.sendMessage("$name [#${team().color}]领主级单位${unit.type.emoji()}出征${unit.type.emoji()}!")
+                Call.logicExplosion(
+                    team,
+                    x,
+                    y,
+                    40f * 8f * team.techData().lordUnitExplosionMultiplier,
+                    7500f * team.techData().lordUnitExplosionMultiplier,
+                    true,
+                    true,
+                    true,
+                    false
+                )
+                Call.soundAt(Sounds.wind3, x, y, 114514f, 0f)
+                Call.effect(Fx.impactReactorExplosion, x, y, 0f, team().color)
+                if (team.techData().buffedLords) {
+                    when (unit.type) {
+                        UnitTypes.toxopid -> {
+                            repeat(16) {
+                                createUnit(unit, UnitTypes.arkyid)
+                            }
+                            Groups.unit.filter { it.team() == team && it.within(unit, 128 * 8f) }.forEach {
+                                it.heal((it.maxHealth * 0.5f).coerceAtMost(3000f))
+                            }
                         }
-                        Groups.unit.filter { it.team() == team && it.within(unit, 128 * 8f) }.forEach {
-                            it.heal((it.maxHealth * 0.5f).coerceAtMost(3000f))
-                        }
-                    }
 
-                    UnitTypes.eclipse -> {
-                        repeat(8) {
-                            createUnit(unit, UnitTypes.sei)
+                        UnitTypes.eclipse -> {
+                            repeat(8) {
+                                createUnit(unit, UnitTypes.sei)
+                            }
+                            Groups.unit.filter { it.team() == team && it.within(unit, 64 * 8f) }.forEach {
+                                it.shield += it.maxHealth * 0.25f
+                            }
                         }
-                        Groups.unit.filter { it.team() == team && it.within(unit, 64 * 8f) }.forEach {
-                            it.shield += it.maxHealth * 0.25f
-                        }
-                    }
 
-                    UnitTypes.conquer -> {
-                        Groups.unit.filter { it.team() == team && it.within(unit, 48 * 8f) }.forEach {
-                            it.apply(StatusEffects.shielded, 32 * 60f)
+                        UnitTypes.conquer -> {
+                            Groups.unit.filter { it.team() == team && it.within(unit, 48 * 8f) }.forEach {
+                                it.apply(StatusEffects.shielded, 32 * 60f)
+                            }
                         }
-                    }
 
-                    UnitTypes.collaris -> {
-                        repeat(8) {
-                            createUnit(unit, UnitTypes.tecta)
+                        UnitTypes.collaris -> {
+                            repeat(8) {
+                                createUnit(unit, UnitTypes.tecta)
+                            }
+                            Groups.unit.filter { it.team() != team && it.within(unit, 128 * 8f) }.forEach {
+                                it.apply(StatusEffects.slow, 12 * 60f)
+                            }
                         }
-                        Groups.unit.filter { it.team() != team && it.within(unit, 128 * 8f) }.forEach {
-                            it.apply(StatusEffects.slow, 12 * 60f)
-                        }
-                    }
 
-                    UnitTypes.aegires -> {
-                        repeat(12) {
-                            createUnit(unit, UnitTypes.vela)
+                        UnitTypes.aegires -> {
+                            repeat(12) {
+                                createUnit(unit, UnitTypes.vela)
+                            }
+                            Groups.unit.filter { it.team() != team && it.within(unit, 128 * 8f) }.forEach {
+                                it.apply(StatusEffects.electrified, 60 * 60f)
+                            }
                         }
-                        Groups.unit.filter { it.team() != team && it.within(unit, 128 * 8f) }.forEach {
-                            it.apply(StatusEffects.electrified, 60 * 60f)
-                        }
-                    }
 
-                    UnitTypes.disrupt -> {
-                        repeat(12) {
-                            createUnit(unit, UnitTypes.quell)
-                        }
-                        launch(Dispatchers.game) {
-                            repeat(60) {
-                                val spawnX = x
-                                val spawnY = y
-                                UnitTypes.disrupt.weapons[0].bullet.spawnUnit.create(team).apply {
-                                    set(spawnX + Random.nextInt(-32, 32) * 8f, spawnY + Random.nextInt(-32, 32) * 8f)
-                                    rotation(360f * Random.nextFloat())
-                                    add()
+                        UnitTypes.disrupt -> {
+                            repeat(12) {
+                                createUnit(unit, UnitTypes.quell)
+                            }
+                            launch(Dispatchers.game) {
+                                repeat(60) {
+                                    val spawnX = x
+                                    val spawnY = y
+                                    UnitTypes.disrupt.weapons[0].bullet.spawnUnit.create(team).apply {
+                                        set(spawnX + Random.nextInt(-32, 32) * 8f, spawnY + Random.nextInt(-32, 32) * 8f)
+                                        rotation(360f * Random.nextFloat())
+                                        add()
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            var damageStartTime: Long
-            val bakHealth = maxHealth
-            while (!dead) {
-                if (!isPlayer) {
+            var damageStartTime: Long = 0
+            val bakHealth = withContext(Dispatchers.game) { maxHealth }
+            while (withContext(Dispatchers.game) { !dead }) {
+                if (withContext(Dispatchers.game) { !isPlayer }) {
                     damageStartTime = Time.millis()
-                    while (!isPlayer) {
-                        apply(StatusEffects.unmoving, 4f * 60f)
-                        apply(StatusEffects.disarmed, 4f * 60f)
-                        unapply(StatusEffects.shielded)
-                        maxHealth = bakHealth * (1f - (Time.timeSinceMillis(damageStartTime) / 1000f / 180f))
-                        Call.label(
-                            "[#${team().color}]未被操控的领主级单位\n${health.format(1)}/${maxHealth.format(1)}\n[red]距离直接死亡还剩${
-                                (180f - (Time.timeSinceMillis(damageStartTime) / 1000f)).format()
-                            }s", 0.2026f, x, y
-                        )
-                        clampHealth()
-                        if (maxHealth <= 0) kill()
+                    while (withContext(Dispatchers.game) { !isPlayer }) {
+                        withContext(Dispatchers.game) {
+                            apply(StatusEffects.unmoving, 4f * 60f)
+                            apply(StatusEffects.disarmed, 4f * 60f)
+                            unapply(StatusEffects.shielded)
+                            maxHealth = bakHealth * (1f - (Time.timeSinceMillis(damageStartTime) / 1000f / 180f))
+                            Call.label(
+                                "[#${team().color}]未被操控的领主级单位\n${health.format(1)}/${maxHealth.format(1)}\n[red]距离直接死亡还剩${
+                                    (180f - (Time.timeSinceMillis(damageStartTime) / 1000f)).format()
+                                }s", 0.2026f, x, y
+                            )
+                            clampHealth()
+                            if (maxHealth <= 0) kill()
+                        }
                         delay(200)
-                        if (dead) break
+                        if (withContext(Dispatchers.game) { dead }) break
                     }
-                    maxHealth = bakHealth
+                    withContext(Dispatchers.game) {
+                        maxHealth = bakHealth
+                    }
                 }
                 delay(200)
             }
@@ -1515,59 +1535,82 @@ suspend fun Player.bankMenu(core: CoreBuild) {
         playerInputing[uuid()] = false
         this += listOf(
             "存金币[#${team().color}]${Iconc.blockCliff}" to {
-                val playerLastText = playerLastSendText[uuid()]
-                sendMessage("------------\n[yellow]请输入所存数量\n[white]------------")
-                val startInputTime = Time.millis()
-                var fail = true
-                var coin = 0
-                playerInputing[uuid()] = true
-                while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
-                    if (playerInputing[uuid()] == false) break
-                    if (playerLastText != playerLastSendText[uuid()]) {
-                        val amount = playerLastSendText[uuid()]?.toIntOrNull()
-                        if (amount == null || amount <= 0 || amount > coins()) break
-                        team().addCoin(amount)
-                        removeCoin(amount)
-                        coin = amount
-                        fail = false
-                        break
+                launch(Dispatchers.Default) {
+                    // 输入等待计时在 Default 线程, 每轮判定与游戏数据操作切回 game
+                    val playerLastText = withContext(Dispatchers.game) {
+                        sendMessage("------------\n[yellow]请输入所存数量\n[white]------------")
+                        playerInputing[uuid()] = true
+                        playerLastSendText[uuid()]
                     }
-                    delay(50L)
-                }
-                playerLastSendText[uuid()] = ""
-                if (fail) {
-                    sendMessage("存钱失败！")
-                } else {
-                    Call.sendMessage("$name [#${team().color}]往队伍银行存储${Iconc.blockCliff}$coin")
-                }
-
-            },
-            "取金币[#${team().color}]${Iconc.blockCliff}" to {
-                if (team().coins() > 0) {
-                    val playerLastText = playerLastSendText[uuid()]
-                    sendMessage("------------\n[yellow]请输入所取数量\n[white]------------")
                     val startInputTime = Time.millis()
                     var fail = true
                     var coin = 0
-                    playerInputing[uuid()] = true
                     while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
-                        if (playerInputing[uuid()] == false) break
-                        if (playerLastText != playerLastSendText[uuid()]) {
-                            val amount = playerLastSendText[uuid()]?.toIntOrNull()
-                            if (amount == null || amount > team().coins() || amount <= 0) break
-                            team().removeCoin(amount)
-                            addCoin(amount)
-                            coin = amount
-                            fail = false
-                            break
+                        val stop = withContext(Dispatchers.game) {
+                            if (playerInputing[uuid()] == false) true
+                            else if (playerLastText != playerLastSendText[uuid()]) {
+                                val amount = playerLastSendText[uuid()]?.toIntOrNull()
+                                if (amount == null || amount <= 0 || amount > coins()) true
+                                else {
+                                    team().addCoin(amount)
+                                    removeCoin(amount)
+                                    coin = amount
+                                    fail = false
+                                    true
+                                }
+                            } else false
                         }
+                        if (stop) break
                         delay(50L)
                     }
-                    playerLastSendText[uuid()] = ""
-                    if (fail) {
-                        sendMessage("取钱失败！")
-                    } else {
-                        Call.sendMessage("$name [#${team().color}]往队伍银行取出${Iconc.blockCliff}$coin")
+                    withContext(Dispatchers.game) {
+                        playerLastSendText[uuid()] = ""
+                        if (fail) {
+                            sendMessage("存钱失败！")
+                        } else {
+                            Call.sendMessage("$name [#${team().color}]往队伍银行存储${Iconc.blockCliff}$coin")
+                        }
+                    }
+                }
+            },
+            "取金币[#${team().color}]${Iconc.blockCliff}" to {
+                if (team().coins() > 0) {
+                    launch(Dispatchers.Default) {
+                        // 输入等待计时在 Default 线程, 每轮判定与游戏数据操作切回 game
+                        val playerLastText = withContext(Dispatchers.game) {
+                            sendMessage("------------\n[yellow]请输入所取数量\n[white]------------")
+                            playerInputing[uuid()] = true
+                            playerLastSendText[uuid()]
+                        }
+                        val startInputTime = Time.millis()
+                        var fail = true
+                        var coin = 0
+                        while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
+                            val stop = withContext(Dispatchers.game) {
+                                if (playerInputing[uuid()] == false) true
+                                else if (playerLastText != playerLastSendText[uuid()]) {
+                                    val amount = playerLastSendText[uuid()]?.toIntOrNull()
+                                    if (amount == null || amount > team().coins() || amount <= 0) true
+                                    else {
+                                        team().removeCoin(amount)
+                                        addCoin(amount)
+                                        coin = amount
+                                        fail = false
+                                        true
+                                    }
+                                } else false
+                            }
+                            if (stop) break
+                            delay(50L)
+                        }
+                        withContext(Dispatchers.game) {
+                            playerLastSendText[uuid()] = ""
+                            if (fail) {
+                                sendMessage("取钱失败！")
+                            } else {
+                                Call.sendMessage("$name [#${team().color}]往队伍银行取出${Iconc.blockCliff}$coin")
+                            }
+                        }
                     }
                 } else {
                     sendMessage("[red]队伍银行没钱给你取！")
@@ -2033,33 +2076,42 @@ suspend fun Player.techTreeMenu(core: CoreBuild, node: TechNode) {
             })
         add(listOf("返回" to { techMenu(core) }))
         add(listOf("等级查找" to {
-            val playerLastText = playerLastSendText[uuid()]
-            sendMessage("------------\n${techLevelMap.keys.minOrNull()!!}[yellow]请输入查询等级[white]${techLevelMap.keys.maxOrNull()!!}\n------------")
-            val startInputTime = Time.millis()
-            var fail = true
-            var level = 1
-            playerInputing[uuid()] = true
-            while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
-                if (playerInputing[uuid()] == false) break
-                if (playerLastText != playerLastSendText[uuid()]) {
-                    val input = playerLastSendText[uuid()]?.toIntOrNull()
-                    if (input == null) {
-                        fail = true
-                        break
-                    }
-                    level = input.coerceAtLeast(techLevelMap.keys.minOrNull()!!)
-                        .coerceAtMost(techLevelMap.keys.maxOrNull()!!)
-                    fail = false
-                    break
+            launch(Dispatchers.Default) {
+                // 输入等待计时在 Default 线程, 每轮判定与菜单/游戏操作切回 game
+                val playerLastText = withContext(Dispatchers.game) {
+                    sendMessage("------------\n${techLevelMap.keys.minOrNull()!!}[yellow]请输入查询等级[white]${techLevelMap.keys.maxOrNull()!!}\n------------")
+                    playerInputing[uuid()] = true
+                    playerLastSendText[uuid()]
                 }
-                delay(50L)
-            }
-            playerLastSendText[uuid()] = ""
-            if (fail) {
-                sendMessage("查询失败！")
-            } else {
-                achievement("[green][百科全书！]", 50)
-                techLevelFindMenu(core, node, level)
+                val startInputTime = Time.millis()
+                var fail = true
+                var level = 1
+                while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
+                    val stop = withContext(Dispatchers.game) {
+                        if (playerInputing[uuid()] == false) true
+                        else if (playerLastText != playerLastSendText[uuid()]) {
+                            val input = playerLastSendText[uuid()]?.toIntOrNull()
+                            if (input == null) true
+                            else {
+                                level = input.coerceAtLeast(techLevelMap.keys.minOrNull()!!)
+                                    .coerceAtMost(techLevelMap.keys.maxOrNull()!!)
+                                fail = false
+                                true
+                            }
+                        } else false
+                    }
+                    if (stop) break
+                    delay(50L)
+                }
+                withContext(Dispatchers.game) {
+                    playerLastSendText[uuid()] = ""
+                    if (fail) {
+                        sendMessage("查询失败！")
+                    } else {
+                        achievement("[green][百科全书！]", 50)
+                        techLevelFindMenu(core, node, level)
+                    }
+                }
             }
         }))
     }
@@ -2091,32 +2143,41 @@ suspend fun Player.techLevelFindMenu(core: CoreBuild, node: TechNode, level: Int
             listOf(
             "返回科技" to { techMenu(core) },
             "再次查询" to {
-                val playerLastText = playerLastSendText[uuid()]
-                sendMessage("------------\n${techLevelMap.keys.minOrNull()!!}[yellow]请输入查询等级[white]${techLevelMap.keys.maxOrNull()!!}\n------------")
-                val startInputTime = Time.millis()
-                var fail = true
-                var levelF = 1
-                playerInputing[uuid()] = true
-                while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
-                    if (playerInputing[uuid()] == false) break
-                    if (playerLastText != playerLastSendText[uuid()]) {
-                        val input = playerLastSendText[uuid()]?.toIntOrNull()
-                        if (input == null) {
-                            fail = true
-                            break
-                        }
-                        levelF = input.coerceAtLeast(techLevelMap.keys.minOrNull()!!)
-                            .coerceAtMost(techLevelMap.keys.maxOrNull()!!)
-                        fail = false
-                        break
+                launch(Dispatchers.Default) {
+                    // 输入等待计时在 Default 线程, 每轮判定与菜单/游戏操作切回 game
+                    val playerLastText = withContext(Dispatchers.game) {
+                        sendMessage("------------\n${techLevelMap.keys.minOrNull()!!}[yellow]请输入查询等级[white]${techLevelMap.keys.maxOrNull()!!}\n------------")
+                        playerInputing[uuid()] = true
+                        playerLastSendText[uuid()]
                     }
-                    delay(50L)
-                }
-                playerLastSendText[uuid()] = ""
-                if (fail) {
-                    sendMessage("查询失败！")
-                } else {
-                    techLevelFindMenu(core, node, levelF)
+                    val startInputTime = Time.millis()
+                    var fail = true
+                    var levelF = 1
+                    while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
+                        val stop = withContext(Dispatchers.game) {
+                            if (playerInputing[uuid()] == false) true
+                            else if (playerLastText != playerLastSendText[uuid()]) {
+                                val input = playerLastSendText[uuid()]?.toIntOrNull()
+                                if (input == null) true
+                                else {
+                                    levelF = input.coerceAtLeast(techLevelMap.keys.minOrNull()!!)
+                                        .coerceAtMost(techLevelMap.keys.maxOrNull()!!)
+                                    fail = false
+                                    true
+                                }
+                            } else false
+                        }
+                        if (stop) break
+                        delay(50L)
+                    }
+                    withContext(Dispatchers.game) {
+                        playerLastSendText[uuid()] = ""
+                        if (fail) {
+                            sendMessage("查询失败！")
+                        } else {
+                            techLevelFindMenu(core, node, levelF)
+                        }
+                    }
                 }
             },
             "返回科技树" to { techTreeMenu(core, node) }
@@ -3590,18 +3651,19 @@ onEnable {
         }
         techTree.whileSetLevel()
     }
-    launch(Dispatchers.game) {
+    launch(Dispatchers.Default) {
         delay(30_000L)
-        if (sunsetMode) {
-            val sunsetTeam = Team.all.filter { it.cores().size > 0 }.random()
-            fun sunsetCores(): List<CoreBuild> {
-                return sunsetTeam.cores().toList().filter { it.cityData().cityType == CityTypes.Sunset }
-            }
+        if (!sunsetMode) return@launch
+        val sunsetTeam = withContext(Dispatchers.game) { Team.all.filter { it.cores().size > 0 }.random() }
+        fun sunsetCores(): List<CoreBuild> {
+            return sunsetTeam.cores().toList().filter { it.cityData().cityType == CityTypes.Sunset }
+        }
+        withContext(Dispatchers.game) {
             Call.sendMessage(
                 """
                 [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
                 [#${sunsetTeam.color}]${sunsetTeam.name} 被选中启动了落日计划！
-                
+
                 [white]直至此队伍被消灭 或 落日计划成功
                 [white]每隔30s此队伍其中一个核心将会变为落日余晖
                 [white]当落日之辉闪耀到一半的核心之时 落日计划正式启动
@@ -3610,19 +3672,25 @@ onEnable {
             """.trimIndent()
             )
             TechDifficult /= 2
-            val teams = Team.all.toList().filter { it != sunsetTeam }
-            var boolean = false
+        }
+        val teams = withContext(Dispatchers.game) { Team.all.toList().filter { it != sunsetTeam } }
+        var boolean = false
+        withContext(Dispatchers.game) {
             teams.forEach {
                 it.techData().friendlyTeams.addAll(teams)
                 it.techData().knowOtherTeamInfo = Long.MAX_VALUE
             }
-            delay(30_000L)
-            while (true) {
+        }
+        delay(30_000L)
+        while (true) {
+            // 每轮落日推进: 游戏数据操作在 withContext(game), 30s 计时(delay)在 Default
+            val done = withContext(Dispatchers.game) {
                 var cores = 0f
                 state.teams.getActive().forEach {
                     cores += it.cores.size
                 }
-                if (sunsetTeam.cores().size > 0) {
+                if (sunsetTeam.cores().size <= 0) true
+                else {
                     sunsetTeam.cores().random().cityData().cityType = CityTypes.Sunset
                     Call.sendMessage(
                         """
@@ -3632,38 +3700,39 @@ onEnable {
                     [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
                 """.trimIndent()
                     )
-                } else {
-                    break
-                }
-                if (sunsetTeam.cores().size > cores / 2) {
-                    Call.sendMessage(
-                        """
-                    [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-                    [#${sunsetTeam.color}]${sunsetTeam.name} 的落日计划正式启动！
-                    
-                    [white]所有城市变为随机一种负面效果城市
-                    [white]此队伍随机一座城市成为落日之光！
-                    [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
-                    """.trimIndent()
-                    )
-                    state.teams.getActive().forEach {
-                        it.cores.forEach {
-                            it.cityData().cityType = CityTypes.moon().random()
+                    if (sunsetTeam.cores().size > cores / 2) {
+                        Call.sendMessage(
+                            """
+                        [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                        [#${sunsetTeam.color}]${sunsetTeam.name} 的落日计划正式启动！
+
+                        [white]所有城市变为随机一种负面效果城市
+                        [white]此队伍随机一座城市成为落日之光！
+                        [white]\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                        """.trimIndent()
+                        )
+                        state.teams.getActive().forEach {
+                            it.cores.forEach {
+                                it.cityData().cityType = CityTypes.moon().random()
+                            }
                         }
-                    }
-                    sunsetTeam.cores().random().apply {
-                        cityData().cityType = CityTypes.SunsetSuper
-                        maxHealth *= 10
-                        health *= 10
-                    }
-                    Groups.player.forEach {
-                        it.achievement("[green][落日 - 启动成功]", 50)
-                    }
-                    boolean = true
-                    break
+                        sunsetTeam.cores().random().apply {
+                            cityData().cityType = CityTypes.SunsetSuper
+                            maxHealth *= 10
+                            health *= 10
+                        }
+                        Groups.player.forEach {
+                            it.achievement("[green][落日 - 启动成功]", 50)
+                        }
+                        boolean = true
+                        true
+                    } else false
                 }
-                delay(30_000)
             }
+            if (done) break
+            delay(30_000)
+        }
+        withContext(Dispatchers.game) {
             teams.forEach {
                 it.techData().friendlyTeams.removeAll(teams)
             }
@@ -3681,155 +3750,166 @@ onEnable {
             }
         }
     }
-    loop(Dispatchers.game) {
-        val cappedUnits = buildList {
-            add(UnitTypes.mono)
-            add(UnitTypes.flare)
-            add(UnitTypes.poly)
-            add(UnitTypes.mega)
-            add(UnitTypes.pulsar)
-            add(UnitTypes.quasar)
-        }
-        state.teams.getActive().forEach { t ->
-            cappedUnits.forEach a@{
-                if (t.getUnits(it) == null) return@a
-                val units = t.getUnits(it).toMutableList().filter { it.owner() == null }
-                if (units.size >= 80) {
-                    val u = units.filter { !it.isPlayer }.random()
-                    u.kill()
-                    u.elevation = 0f
+    loop(Dispatchers.Default) {
+        withContext(Dispatchers.game) {
+            val cappedUnits = buildList {
+                add(UnitTypes.mono)
+                add(UnitTypes.flare)
+                add(UnitTypes.poly)
+                add(UnitTypes.mega)
+                add(UnitTypes.pulsar)
+                add(UnitTypes.quasar)
+            }
+            state.teams.getActive().forEach { t ->
+                cappedUnits.forEach a@{
+                    if (t.getUnits(it) == null) return@a
+                    val units = t.getUnits(it).toMutableList().filter { it.owner() == null }
+                    if (units.size >= 80) {
+                        val u = units.filter { !it.isPlayer }.random()
+                        u.kill()
+                        u.elevation = 0f
+                    }
                 }
             }
         }
         delay(50L)
     }
-    loop(Dispatchers.game) {
-        var cores = 0f
-        state.teams.getActive().forEach {
-            cores += it.cores.size
-        }
-        state.teams.getActive().forEach { it ->
-            val rate = it.team.coins() * 0.001f * (0.5f - it.cores.size / cores) * 2f
-            it.team.addCoin(
-                if (it.team.techData().hedgeFund) abs(rate.toInt()) * 5 else rate.toInt()
-                    .coerceAtLeast(if (it.team.techData().bankNoRemoveCoins) 0 else Int.MIN_VALUE)
-            )
-            if (it.team.coins() < 0) it.team.setCoin(0)
-            it.cores.forEach { c ->
-                if (c.cityData().cityType.name == "[white]均衡城市" && Random.nextFloat() <= 0.001 && it.team.techData().autoSetCityType) {
-                    val type =
-                        arrayOf(CityTypes.War, CityTypes.Economic, CityTypes.Logistics, CityTypes.ResearchI).random()
-                    c.cityData().cityType = type
-                }
-                val lord = Groups.player.filter { p -> p.uuid() in c.lord() && p.team() == c.team }
-                var amount = c.level() * max(
-                    (Time.timeSinceMillis(startTime) / 1000 / 60 / 3 * c.cityData().cityType.coinsMultiplier).toInt(),
-                    1
+    loop(Dispatchers.Default) {
+        withContext(Dispatchers.game) {
+            var cores = 0f
+            state.teams.getActive().forEach {
+                cores += it.cores.size
+            }
+            state.teams.getActive().forEach { it ->
+                val rate = it.team.coins() * 0.001f * (0.5f - it.cores.size / cores) * 2f
+                it.team.addCoin(
+                    if (it.team.techData().hedgeFund) abs(rate.toInt()) * 5 else rate.toInt()
+                        .coerceAtLeast(if (it.team.techData().bankNoRemoveCoins) 0 else Int.MIN_VALUE)
                 )
-                val baseAmount = c.level() * max((Time.timeSinceMillis(startTime) / 1000 / 60 / 3).toInt(), 1)
-                if (lord.isNotEmpty()) {
-                    amount /= 2
-                    val lordAmount = amount / lord.size
-                    lord.forEach { p ->
-                        p.addCoin(lordAmount, true)
+                if (it.team.coins() < 0) it.team.setCoin(0)
+                it.cores.forEach { c ->
+                    if (c.cityData().cityType.name == "[white]均衡城市" && Random.nextFloat() <= 0.001 && it.team.techData().autoSetCityType) {
+                        val type =
+                            arrayOf(CityTypes.War, CityTypes.Economic, CityTypes.Logistics, CityTypes.ResearchI).random()
+                        c.cityData().cityType = type
                     }
-                }
-                val expAmount =
-                    (c.cityData().cityType.researchMultiplier - 1f) * it.team.techData().level * c.level() / 3f + c.level()
-                it.team.techData().exp += expAmount
-                c.addCoin(amount)
-                c.cityData().population += (c.level() * Random.nextFloat() * (1f + c.coins() / (c.maxHealth * 0.4f)) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(
-                    1f
-                )).toInt().coerceAtLeast(1).coerceAtMost(
-                    (((c.level() + 1f).pow(3)) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(
+                    val lord = Groups.player.filter { p -> p.uuid() in c.lord() && p.team() == c.team }
+                    var amount = c.level() * max(
+                        (Time.timeSinceMillis(startTime) / 1000 / 60 / 3 * c.cityData().cityType.coinsMultiplier).toInt(),
+                        1
+                    )
+                    val baseAmount = c.level() * max((Time.timeSinceMillis(startTime) / 1000 / 60 / 3).toInt(), 1)
+                    if (lord.isNotEmpty()) {
+                        amount /= 2
+                        val lordAmount = amount / lord.size
+                        lord.forEach { p ->
+                            p.addCoin(lordAmount, true)
+                        }
+                    }
+                    val expAmount =
+                        (c.cityData().cityType.researchMultiplier - 1f) * it.team.techData().level * c.level() / 3f + c.level()
+                    it.team.techData().exp += expAmount
+                    c.addCoin(amount)
+                    c.cityData().population += (c.level() * Random.nextFloat() * (1f + c.coins() / (c.maxHealth * 0.4f)) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(
                         1f
-                    )).toInt() - c.cityData().population
-                )
-                val allyText = buildString {
-                    appendLine(
-                        "[#${c.team.color}]${Iconc.blockCliff}${c.coins()} ${Iconc.players}${c.cityData().population}/${
-                            ((c.level() + 1f).pow(
-                                3
-                            ) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(1f)).toInt()
-                        }"
+                    )).toInt().coerceAtLeast(1).coerceAtMost(
+                        (((c.level() + 1f).pow(3)) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(
+                            1f
+                        )).toInt() - c.cityData().population
                     )
-                    append("[white]${amount.levelText()}[#${c.team.color}]${Iconc.blockCliff}$amount($baseAmount)/s")
-                    appendLine(" [white]| [sky]${Iconc.teamSharded}${expAmount.format(1)}/s")
-                    lord.forEach {
-                        appendLine("[white]${it.name}")
+                    val allyText = buildString {
+                        appendLine(
+                            "[#${c.team.color}]${Iconc.blockCliff}${c.coins()} ${Iconc.players}${c.cityData().population}/${
+                                ((c.level() + 1f).pow(
+                                    3
+                                ) * (1f + (1f - c.cityData().cityType.unitCostMultiplier) * 5f).coerceAtLeast(1f)).toInt()
+                            }"
+                        )
+                        append("[white]${amount.levelText()}[#${c.team.color}]${Iconc.blockCliff}$amount($baseAmount)/s")
+                        appendLine(" [white]| [sky]${Iconc.teamSharded}${expAmount.format(1)}/s")
+                        lord.forEach {
+                            appendLine("[white]${it.name}")
+                        }
+                        append("[white]")
+                        append(c.levelText())
+                        append("[white] | ")
+                        append(c.cityData().cityType.name)
                     }
-                    append("[white]")
-                    append(c.levelText())
-                    append("[white] | ")
-                    append(c.cityData().cityType.name)
-                }
-                val enemyText = buildString {
-                    append("[#${c.team.color}]${Iconc.blockCliff}${"?".repeat(c.coins().toString().length)} ")
-                    repeat((c.health / c.maxHealth * 10).toInt()) {
-                        append("|")
+                    val enemyText = buildString {
+                        append("[#${c.team.color}]${Iconc.blockCliff}${"?".repeat(c.coins().toString().length)} ")
+                        repeat((c.health / c.maxHealth * 10).toInt()) {
+                            append("|")
+                        }
+                        appendLine("")
+                        appendLine("[white]${amount.levelText()}[#${c.team.color}]$amount/s")
+                        append("[white]")
+                        append(c.levelText(true))
                     }
-                    appendLine("")
-                    appendLine("[white]${amount.levelText()}[#${c.team.color}]$amount/s")
-                    append("[white]")
-                    append(c.levelText(true))
-                }
-                Groups.player.filter { p ->
-                    (p.within(c.x, c.y, 60f * 8f)
-                            || (world.tileWorld(p.mouseX, p.mouseY) != null
-                            && world.tileWorld(p.mouseX, p.mouseY).within(c.x, c.y, 30f * 8f)))
-                            && fogControl.isVisible(p.team(), c.x, c.y)
-                            || p in lord
-                }.forEach { p ->
-                    Call.label(
-                        p.con,
-                        if (p.team() == it.team || p.team()
-                                .techData().knowOtherTeamInfo >= Time.millis()
-                        ) allyText else enemyText,
-                        1.013f,
-                        c.x,
-                        c.y
-                    )
-                }
-                Units.nearby(null, c.x, c.y, 20 * 8f) { u ->
-                    if (u.team == c.team && u.health < u.maxHealth) {
-                        u.health += u.maxHealth / 100 * c.cityData().cityType.healMultiplier * c.level() / 6
-                        u.clampHealth()
-                        Call.transferItemEffect(Items.plastanium, c.x, c.y, u)
+                    Groups.player.filter { p ->
+                        (p.within(c.x, c.y, 60f * 8f)
+                                || (world.tileWorld(p.mouseX, p.mouseY) != null
+                                && world.tileWorld(p.mouseX, p.mouseY).within(c.x, c.y, 30f * 8f)))
+                                && fogControl.isVisible(p.team(), c.x, c.y)
+                                || p in lord
+                    }.forEach { p ->
+                        Call.label(
+                            p.con,
+                            if (p.team() == it.team || p.team()
+                                    .techData().knowOtherTeamInfo >= Time.millis()
+                            ) allyText else enemyText,
+                            1.013f,
+                            c.x,
+                            c.y
+                        )
+                    }
+                    Units.nearby(null, c.x, c.y, 20 * 8f) { u ->
+                        if (u.team == c.team && u.health < u.maxHealth) {
+                            u.health += u.maxHealth / 100 * c.cityData().cityType.healMultiplier * c.level() / 6
+                            u.clampHealth()
+                            Call.transferItemEffect(Items.plastanium, c.x, c.y, u)
+                        }
                     }
                 }
             }
         }
         delay(1000)
     }
-    loop(Dispatchers.game) {
-        Team.all.forEach { team ->
-            if (team.techData().teamRespawn && !team.techData().teamRespawnUsed && team.data()
-                    .noCores() && !state.gameOver
-            ) {
-                while (!team.cores().isEmpty) {
-                    delay(50L)
-                }
+    loop(Dispatchers.Default) {
+        // 涅槃重生触发: 判定与结算回主线程, 等待核心重建的计时留在 Default 线程(不阻塞主线程)
+        for (team in withContext(Dispatchers.game) { Team.all.toList() }) {
+            val need = withContext(Dispatchers.game) {
+                team.techData().teamRespawn && !team.techData().teamRespawnUsed && team.data().noCores() && !state.gameOver
+            }
+            if (!need) continue
+            while (withContext(Dispatchers.game) { !team.cores().isEmpty }) {
+                delay(50L)
+            }
+            withContext(Dispatchers.game) {
                 team.rules().blockHealthMultiplier *= 5f
                 Call.setRules(state.rules)
-                launch(Dispatchers.game) {
-                    delay(120_000)
+            }
+            launch(Dispatchers.Default) {
+                delay(120_000)
+                withContext(Dispatchers.game) {
                     team.rules().blockHealthMultiplier /= 5f
                     Call.setRules(state.rules)
                     Call.sendMessage("\n[#${team.color}]${team.name}[white]的涅槃重生血量增幅已经结束\n")
                 }
+            }
+            withContext(Dispatchers.game) {
                 Call.sendMessage(
                     """
-                                            
+
                                             ------------------------------------------------
                                             [#${team.color}]${team.name} [purple]史诗科技[#${team.color}] 涅槃重生 触发!
-                                            
+
                                             [white]全场随机挑选核心重生!
                                             全队成员和队伍银行金钱翻倍!
-                                            
+
                                             队伍建筑血量 ${(team.rules().blockHealthMultiplier / 5f).format()} -> ${team.rules().blockHealthMultiplier.format()}
                                             持续120s!
                                             ------------------------------------------------
-                                            
+
                                         """.trimIndent()
                 )
                 Groups.player.forEach {
@@ -3856,114 +3936,118 @@ onEnable {
                 Call.effect(Fx.impactReactorExplosion, tile.worldx(), tile.worldy(), 0f, team.color)
             }
         }
-        state.teams.getActive().forEach { t ->
-            val pads = t.pads()
-            val accelerators = Groups.build.toList().filter { it.block is Accelerator && it.team == t.team }
-            accelerators.forEach {
-                (it as AcceleratorBuild)
-                if (it.full()) {
-                    Call.effect(Fx.shieldWave, it.x, it.y, 0f, t.team.color)
-                    Call.effect(Fx.padlaunch, it.x, it.y, 0f, t.team.color)
-                }
-                Call.label(
-                    """
-                    [#${it.team.color}]${if (it.full()) "超级武器充能完毕！" else "超级武器充能..."}
-                    [white]${Iconc.itemCopper} ${it.items.get(Items.copper)}/${(it.block as Accelerator).launchBlock.requirements[0].amount}
-                    [white]${Iconc.itemLead} ${it.items.get(Items.lead)}/${(it.block as Accelerator).launchBlock.requirements[1].amount}
-                """.trimIndent(), 1.013f, it.x, it.y
-                )
-            }
-            pads.forEach padsForEach@{
-                val pad = (it as LaunchPad.LaunchPadBuild)
-                var accelerator = accelerators.toList().firstOrNull { !(it as AcceleratorBuild).full(Items.copper) }
-                if (pad.items.has(Items.copper) && accelerator != null) {
-                    val amount = pad.items.get(Items.copper)
-                    Call.setItem(pad, Items.copper, 0)
-                    Call.setItem(accelerator, Items.copper, accelerator.items.get(Items.copper) + amount)
-                }
-                accelerator = accelerators.toList().firstOrNull { !(it as AcceleratorBuild).full(Items.lead) }
-                if (pad.items.has(Items.lead) && accelerator != null) {
-                    val amount = pad.items.get(Items.lead)
-                    Call.setItem(pad, Items.lead, 0)
-                    Call.setItem(accelerator, Items.lead, accelerator.items.get(Items.lead) + amount)
-                }
-                if (!pad.padData().showInfo) return@padsForEach
-                val allyText = buildString {
-                    appendLine("[#${t.team.color}]${if (pad.padData().name != "") pad.padData().name else "(${pad.tileX()},${pad.tileY()})"}")
-                    val targetPad = pad.padData().targetPad
-                    appendLine("[#${t.team.color}]传送目标 ${targetPad?.padData()?.name ?: ""}")
-                    if (targetPad == null) {
-                        append("[lightgray]未配置")
-                    } else if (!targetPad.isValid) {
-                        append("[lightgray]失效")
-                    } else {
-                        append("[white]${Iconc.blockLaunchPad}(${targetPad.tileX()},${targetPad.tileY()})${Iconc.blockLaunchPad}")
+        withContext(Dispatchers.game) {
+            state.teams.getActive().forEach { t ->
+                val pads = t.pads()
+                val accelerators = Groups.build.toList().filter { it.block is Accelerator && it.team == t.team }
+                accelerators.forEach {
+                    (it as AcceleratorBuild)
+                    if (it.full()) {
+                        Call.effect(Fx.shieldWave, it.x, it.y, 0f, t.team.color)
+                        Call.effect(Fx.padlaunch, it.x, it.y, 0f, t.team.color)
                     }
-                }
-                val enemyText = buildString {
-                    appendLine("${Iconc.blockLaunchPad}[#${t.team.color}][white](${pad.tileX()},${pad.tileY()})[#${t.team.color}]${Iconc.blockLaunchPad}")
-                    appendLine("[#${t.team.color}]传送目标")
-                    append("[lightgray]未知")
-                }
-                Groups.player.filter { p ->
-                    (p.within(pad.x, pad.y, 60f * 8f)
-                            || (world.tileWorld(p.mouseX, p.mouseY) != null
-                            && world.tileWorld(p.mouseX, p.mouseY).within(pad.x, pad.y, 30f * 8f)))
-                            && fogControl.isVisible(p.team(), pad.x, pad.y)
-                }.forEach { p ->
                     Call.label(
-                        p.con,
-                        if (p.team() == it.team || p.team()
-                                .techData().knowOtherTeamInfo >= Time.millis()
-                        ) allyText else enemyText,
-                        1.013f,
-                        pad.x,
-                        pad.y
+                        """
+                        [#${it.team.color}]${if (it.full()) "超级武器充能完毕！" else "超级武器充能..."}
+                        [white]${Iconc.itemCopper} ${it.items.get(Items.copper)}/${(it.block as Accelerator).launchBlock.requirements[0].amount}
+                        [white]${Iconc.itemLead} ${it.items.get(Items.lead)}/${(it.block as Accelerator).launchBlock.requirements[1].amount}
+                    """.trimIndent(), 1.013f, it.x, it.y
                     )
+                }
+                pads.forEach padsForEach@{
+                    val pad = (it as LaunchPad.LaunchPadBuild)
+                    var accelerator = accelerators.toList().firstOrNull { !(it as AcceleratorBuild).full(Items.copper) }
+                    if (pad.items.has(Items.copper) && accelerator != null) {
+                        val amount = pad.items.get(Items.copper)
+                        Call.setItem(pad, Items.copper, 0)
+                        Call.setItem(accelerator, Items.copper, accelerator.items.get(Items.copper) + amount)
+                    }
+                    accelerator = accelerators.toList().firstOrNull { !(it as AcceleratorBuild).full(Items.lead) }
+                    if (pad.items.has(Items.lead) && accelerator != null) {
+                        val amount = pad.items.get(Items.lead)
+                        Call.setItem(pad, Items.lead, 0)
+                        Call.setItem(accelerator, Items.lead, accelerator.items.get(Items.lead) + amount)
+                    }
+                    if (!pad.padData().showInfo) return@padsForEach
+                    val allyText = buildString {
+                        appendLine("[#${t.team.color}]${if (pad.padData().name != "") pad.padData().name else "(${pad.tileX()},${pad.tileY()})"}")
+                        val targetPad = pad.padData().targetPad
+                        appendLine("[#${t.team.color}]传送目标 ${targetPad?.padData()?.name ?: ""}")
+                        if (targetPad == null) {
+                            append("[lightgray]未配置")
+                        } else if (!targetPad.isValid) {
+                            append("[lightgray]失效")
+                        } else {
+                            append("[white]${Iconc.blockLaunchPad}(${targetPad.tileX()},${targetPad.tileY()})${Iconc.blockLaunchPad}")
+                        }
+                    }
+                    val enemyText = buildString {
+                        appendLine("${Iconc.blockLaunchPad}[#${t.team.color}][white](${pad.tileX()},${pad.tileY()})[#${t.team.color}]${Iconc.blockLaunchPad}")
+                        appendLine("[#${t.team.color}]传送目标")
+                        append("[lightgray]未知")
+                    }
+                    Groups.player.filter { p ->
+                        (p.within(pad.x, pad.y, 60f * 8f)
+                                || (world.tileWorld(p.mouseX, p.mouseY) != null
+                                && world.tileWorld(p.mouseX, p.mouseY).within(pad.x, pad.y, 30f * 8f)))
+                                && fogControl.isVisible(p.team(), pad.x, pad.y)
+                    }.forEach { p ->
+                        Call.label(
+                            p.con,
+                            if (p.team() == it.team || p.team()
+                                    .techData().knowOtherTeamInfo >= Time.millis()
+                            ) allyText else enemyText,
+                            1.013f,
+                            pad.x,
+                            pad.y
+                        )
+                    }
                 }
             }
         }
         delay(1000)
     }
-    loop(Dispatchers.game) {
-        Groups.player.forEach {
-            val text = buildString {
-                appendLine("[#${it.team().color}]金币:${Iconc.blockCliff}${it.coins()}")
-                appendLine("军团等级:${it.unitType().level()}")
-                appendLine(
-                    "单位上限:${
-                        Groups.unit.toList().filter { u -> u.owner() == it.uuid() }.size
-                    }/${it.unitCap()}"
-                )
-                if (!it.checkCooldown())
-                    append("[red]收取资源冷却时间:${cooldown[it.uuid()] / 1000 - Time.timeSinceMillis(startTime) / 1000}s")
-                else
-                    append("[green]收取资源冷却完毕")
-                if (it.unitType().level() == 5)
-                    if (!it.checkLordCooldown())
-                        append(
-                            "\n[red]领主降临冷却时间:${
-                                playerLordCooldown[it.uuid()] / 1000 - Time.timeSinceMillis(
-                                    startTime
-                                ) / 1000
-                            }s"
-                        )
+    loop(Dispatchers.Default) {
+        withContext(Dispatchers.game) {
+            Groups.player.forEach {
+                val text = buildString {
+                    appendLine("[#${it.team().color}]金币:${Iconc.blockCliff}${it.coins()}")
+                    appendLine("军团等级:${it.unitType().level()}")
+                    appendLine(
+                        "单位上限:${
+                            Groups.unit.toList().filter { u -> u.owner() == it.uuid() }.size
+                        }/${it.unitCap()}"
+                    )
+                    if (!it.checkCooldown())
+                        append("[red]收取资源冷却时间:${cooldown[it.uuid()] / 1000 - Time.timeSinceMillis(startTime) / 1000}s")
                     else
-                        append("\n[green]领主降临冷却完毕")
-                if (it.unitType().level() > 0) {
-                    appendLine("[white]")
-                    append("军团类型:${it.unitType()?.emoji()}")
-                    if (it.unitType().level() >= 5 && it.lordUnitType() != null)
-                        append("领主类型:${it.lordUnitType()?.emoji()}")
+                        append("[green]收取资源冷却完毕")
+                    if (it.unitType().level() == 5)
+                        if (!it.checkLordCooldown())
+                            append(
+                                "\n[red]领主降临冷却时间:${
+                                    playerLordCooldown[it.uuid()] / 1000 - Time.timeSinceMillis(
+                                        startTime
+                                    ) / 1000
+                                }s"
+                            )
+                        else
+                            append("\n[green]领主降临冷却完毕")
+                    if (it.unitType().level() > 0) {
+                        appendLine("[white]")
+                        append("军团类型:${it.unitType()?.emoji()}")
+                        if (it.unitType().level() >= 5 && it.lordUnitType() != null)
+                            append("领主类型:${it.lordUnitType()?.emoji()}")
+                    }
                 }
-            }
-            Call.setHudText(it.con, text)
+                Call.setHudText(it.con, text)
 
-            if (it.lastTeam() != it.team() && it.lastTeam().data().hasCore()) {
-                it.lastTeam().addCoin(it.coins())
-                it.removeCoin(it.coins())
+                if (it.lastTeam() != it.team() && it.lastTeam().data().hasCore()) {
+                    it.lastTeam().addCoin(it.coins())
+                    it.removeCoin(it.coins())
+                }
+                it.lastTeam(it.team())
             }
-            it.lastTeam(it.team())
         }
         delay(100)
     }
@@ -4008,64 +4092,74 @@ suspend fun Player.megaStructuresInfoMenu(launcher: VariableReactorBuild, megaSt
         add(listOf("${megaStructure.status(team())}发射！" to {
             if (megaStructure.status(team()) == "[green]■" && launcher.isValid && !launcher.launching()) {
                 val team = team()
-                launch(Dispatchers.game) {
-                    Call.sendMessage(
-                        """
-                    [white]------------------------------------------------
-                    ${name()}[#${team.color}]正在发射${megaStructure.name}
-                        
-                    [white]${megaStructure.desc}
-                        
-                    [red]将会在${(megaStructure.cost() / 1000f).format()}s内彻底升空！
-                    击碎在那的通量反应堆停止发射！
-                    [white]------------------------------------------------    
-                    """.trimIndent().replace(" ", "")
-                    )
-                    Call.sendMessage("[#eab678ff]<Mark>[white](${launcher.tileX()},${launcher.tileY()})")
-
-                    megaStructure.requirements.forEach { (t, u) ->
-                        team.core().items.remove(t, u)
-                    }
-
-                    launching[launcher] = true
-
-                    team.techData().megaStructureQueue.add(megaStructure)
-                    val launchTime = Time.millis()
-                    var result = true
-                    while (Time.timeSinceMillis(launchTime) < megaStructure.cost()) {
-                        if (!launcher.isValid) {
-                            result = false
-                            break
-                        }
-                        Call.label(
-                            "${megaStructure.name}[#${team.color}]正在发射！\n${(Time.timeSinceMillis(launchTime) / 1000f).format()}s/${(megaStructure.cost() / 1000f).format()}s",
-                            0.7026f,
-                            launcher.x,
-                            launcher.y
-                        )
-                        Call.effect(Fx.spawnShockwave, launcher.x, launcher.y, 0f, team().color)
-                        delay(500L)
-                    }
-                    if (result) {
+                launch(Dispatchers.Default) {
+                    withContext(Dispatchers.game) {
                         Call.sendMessage(
                             """
                         [white]------------------------------------------------
-                        ${name()}[#${team.color}]发射${megaStructure.name}成功！
-                            
+                        ${name()}[#${team.color}]正在发射${megaStructure.name}
+
                         [white]${megaStructure.desc}
-                            
-                        [green]此效果将会永久持续！
+
+                        [red]将会在${(megaStructure.cost() / 1000f).format()}s内彻底升空！
+                        击碎在那的通量反应堆停止发射！
                         [white]------------------------------------------------    
                         """.trimIndent().replace(" ", "")
                         )
-                        achievement("[purple][轨道巨构发射成功！]", 200, true)
-                        team.techData().megaStructures.add(megaStructure)
-                        megaStructure.activeEffect?.invoke(team)
-                    } else {
-                        Call.sendMessage("[#${team.color}]正在发射的${megaStructure.name}确定发射失败！")
+                        Call.sendMessage("[#eab678ff]<Mark>[white](${launcher.tileX()},${launcher.tileY()})")
+
+                        megaStructure.requirements.forEach { (t, u) ->
+                            team.core().items.remove(t, u)
+                        }
+
+                        launching[launcher] = true
+
+                        team.techData().megaStructureQueue.add(megaStructure)
                     }
-                    team.techData().megaStructureQueue.remove(megaStructure)
-                    launching[launcher] = false
+                    val launchTime = Time.millis()
+                    var result = true
+                    while (Time.timeSinceMillis(launchTime) < megaStructure.cost()) {
+                        val alive = withContext(Dispatchers.game) {
+                            if (!launcher.isValid) false
+                            else {
+                                Call.label(
+                                    "${megaStructure.name}[#${team.color}]正在发射！\n${(Time.timeSinceMillis(launchTime) / 1000f).format()}s/${(megaStructure.cost() / 1000f).format()}s",
+                                    0.7026f,
+                                    launcher.x,
+                                    launcher.y
+                                )
+                                Call.effect(Fx.spawnShockwave, launcher.x, launcher.y, 0f, team().color)
+                                true
+                            }
+                        }
+                        if (!alive) {
+                            result = false
+                            break
+                        }
+                        delay(500L)
+                    }
+                    withContext(Dispatchers.game) {
+                        if (result) {
+                            Call.sendMessage(
+                                """
+                            [white]------------------------------------------------
+                            ${name()}[#${team.color}]发射${megaStructure.name}成功！
+
+                            [white]${megaStructure.desc}
+
+                            [green]此效果将会永久持续！
+                            [white]------------------------------------------------    
+                            """.trimIndent().replace(" ", "")
+                            )
+                            achievement("[purple][轨道巨构发射成功！]", 200, true)
+                            team.techData().megaStructures.add(megaStructure)
+                            megaStructure.activeEffect?.invoke(team)
+                        } else {
+                            Call.sendMessage("[#${team.color}]正在发射的${megaStructure.name}确定发射失败！")
+                        }
+                        team.techData().megaStructureQueue.remove(megaStructure)
+                        launching[launcher] = false
+                    }
                 }
             } else {
                 sendMessage("[red]发射失败")
@@ -4123,31 +4217,41 @@ suspend fun Player.launchPadMenu(pad: LaunchPad.LaunchPadBuild) {
         playerInputing[uuid()] = false
         this += listOf(
             "[cyan]命名发射台！" to {
-                val playerLastText = playerLastSendText[uuid()]
-                sendMessage("------------\n[yellow]请输入此发射台改名名称(最大七个字)\n[white]------------")
-                val startInputTime = Time.millis()
-                var fail = true
-                var newName = "- "
-                playerInputing[uuid()] = true
-                while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
-                    if (playerInputing[uuid()] == false) break
-                    if (playerLastText != playerLastSendText[uuid()] && playerLastSendText[uuid()] != null) {
-                        if (playerLastSendText[uuid()] == pad.padData().name || playerLastSendText[uuid()]!!.length > 7) {
-                            break
-                        }
-                        newName += playerLastSendText[uuid()]
-                        pad.padData().name = newName
-                        fail = false
-                        break
+                launch(Dispatchers.Default) {
+                    // 输入等待计时在 Default 线程, 每轮判定与游戏数据操作切回 game
+                    val playerLastText = withContext(Dispatchers.game) {
+                        sendMessage("------------\n[yellow]请输入此发射台改名名称(最大七个字)\n[white]------------")
+                        playerInputing[uuid()] = true
+                        playerLastSendText[uuid()]
                     }
-                    delay(50L)
+                    val startInputTime = Time.millis()
+                    var fail = true
+                    var newName = "- "
+                    while (Time.timeSinceMillis(startInputTime) / 1000 <= 15) {
+                        val stop = withContext(Dispatchers.game) {
+                            if (playerInputing[uuid()] == false) true
+                            else if (playerLastText != playerLastSendText[uuid()] && playerLastSendText[uuid()] != null) {
+                                if (playerLastSendText[uuid()] == pad.padData().name || playerLastSendText[uuid()]!!.length > 7) true
+                                else {
+                                    newName += playerLastSendText[uuid()]
+                                    pad.padData().name = newName
+                                    fail = false
+                                    true
+                                }
+                            } else false
+                        }
+                        if (stop) break
+                        delay(50L)
+                    }
+                    withContext(Dispatchers.game) {
+                        if (fail) {
+                            sendMessage("命名失败！")
+                        } else {
+                            sendMessage("命名成功！现在此发射台名为：${playerLastSendText[uuid()]}")
+                        }
+                        playerLastSendText[uuid()] = ""
+                    }
                 }
-                if (fail) {
-                    sendMessage("命名失败！")
-                } else {
-                    sendMessage("命名成功！现在此发射台名为：${playerLastSendText[uuid()]}")
-                }
-                playerLastSendText[uuid()] = ""
             },
             "${if (pad.padData().showInfo) "[green]" else "[red]"}发射台信息显示" to {
                 pad.padData().showInfo = !pad.padData().showInfo
@@ -4159,129 +4263,157 @@ suspend fun Player.launchPadMenu(pad: LaunchPad.LaunchPadBuild) {
                 Call.effect(Fx.teleport, pad.x, pad.y, 0f, team().color)
                 Units.nearby(team(), pad.x, pad.y, itemTransferRange) {
                     if (it.owner() == uuid() || it == unit())
-                        launch(Dispatchers.game) {
+                        launch(Dispatchers.Default) {
                             var times = 0
                             while (true) {
-                                Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
-
-                                var sx = targetPad.x + Tmp.v1.x
-                                var sy = targetPad.y + Tmp.v1.y
-
-                                if (it.canPass(World.toTile(sx), World.toTile(sy))) {
-                                    while (!it.within(targetPad.x, targetPad.y, itemTransferRange)) {
-                                        it.set(sx, sy)
-                                        it.snapInterpolation()
+                                var sx = 0f
+                                var sy = 0f
+                                val pass = withContext(Dispatchers.game) {
+                                    Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
+                                    sx = targetPad.x + Tmp.v1.x
+                                    sy = targetPad.y + Tmp.v1.y
+                                    it.canPass(World.toTile(sx), World.toTile(sy))
+                                }
+                                if (pass) {
+                                    while (withContext(Dispatchers.game) { !it.within(targetPad.x, targetPad.y, itemTransferRange) }) {
+                                        withContext(Dispatchers.game) {
+                                            it.set(sx, sy)
+                                            it.snapInterpolation()
+                                        }
                                         delay(50L)
                                     }
-                                    Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                    withContext(Dispatchers.game) { Call.effect(Fx.teleportOut, sx, sy, 0f, team().color) }
                                     break
                                 }
                                 if (++times > 20) {
                                     sx = targetPad.x
                                     sy = targetPad.y
-                                    while (!it.within(targetPad.x, targetPad.y, itemTransferRange)) {
-                                        it.set(sx, sy)
-                                        it.snapInterpolation()
+                                    while (withContext(Dispatchers.game) { !it.within(targetPad.x, targetPad.y, itemTransferRange) }) {
+                                        withContext(Dispatchers.game) {
+                                            it.set(sx, sy)
+                                            it.snapInterpolation()
+                                        }
                                         delay(50L)
                                     }
-                                    Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                    withContext(Dispatchers.game) { Call.effect(Fx.teleportOut, sx, sy, 0f, team().color) }
                                     break
                                 }
                             }
-                            if (!it.team.techData().tpNoDeBuff) {
-                                it.apply(StatusEffects.unmoving, (it.speed() / 2f) * 5f * 60f)
-                                it.apply(StatusEffects.disarmed, (it.speed() / 2f) * 3.5f * 60f)
-                                it.apply(StatusEffects.slow, (it.speed() / 2f) * 10.5f * 60f)
+                            withContext(Dispatchers.game) {
+                                if (!it.team.techData().tpNoDeBuff) {
+                                    it.apply(StatusEffects.unmoving, (it.speed() / 2f) * 5f * 60f)
+                                    it.apply(StatusEffects.disarmed, (it.speed() / 2f) * 3.5f * 60f)
+                                    it.apply(StatusEffects.slow, (it.speed() / 2f) * 10.5f * 60f)
+                                }
+                                if (it == unit()) Call.setCameraPosition(con, targetPad.x, targetPad.y)
                             }
-                            if (it == unit()) Call.setCameraPosition(con, targetPad.x, targetPad.y)
                         }
                 }
                 Call.effect(Fx.teleportActivate, targetPad.x, targetPad.y, 0f, team().color)
             })
             if (MegaStructures.airDrop in team().techData().megaStructures) {
                 this += listOf("[cyan]传送你附近的军团单位至指定目标点！\n[red]会有强大的副作用" to {
-                    launch(Dispatchers.game) {
+                    launch(Dispatchers.Default) {
                         val team = team()
-                        playerTapping[uuid()] = true
                         val startTappingTime = Time.millis()
                         var fail = false
-                        sendMessage("[yellow]对目标点点击4次来传送至目标点\n[lightgray]再次点击发射台取消")
-                        while ((playerLastTapTile[uuid()]?.second ?: 0) < 4) {
-                            if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
-                                sendMessage("[red]选择超时")
-                                fail = true
-                                break
+                        withContext(Dispatchers.game) {
+                            playerTapping[uuid()] = true
+                            sendMessage("[yellow]对目标点点击4次来传送至目标点\n[lightgray]再次点击发射台取消")
+                        }
+                        // 选点循环: 计时(delay)在 Default 线程, 每轮判定与提示用 withContext 回主线程
+                        while (true) {
+                            val stop = withContext(Dispatchers.game) {
+                                if ((playerLastTapTile[uuid()]?.second ?: 0) >= 4) true
+                                else if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
+                                    sendMessage("[red]选择超时")
+                                    fail = true
+                                    true
+                                } else if (playerTapping[uuid()] == false || !pad.isValid || pad.team != team()) {
+                                    sendMessage("[red]选择取消")
+                                    fail = true
+                                    true
+                                } else false
                             }
-                            if (playerTapping[uuid()] == false || !pad.isValid || pad.team != team()) {
-                                sendMessage("[red]选择取消")
-                                fail = true
-                                break
-                            }
+                            if (stop) break
                             delay(50L)
                         }
-                        playerTapping[uuid()] = false
-                        val tile = playerLastTapTile[uuid()]!!.first
-                        if (!fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt())) {
-                            sendMessage("[red]指向性传送需要拥有视野！")
+                        withContext(Dispatchers.game) { playerTapping[uuid()] = false }
+                        val tile = withContext(Dispatchers.game) { playerLastTapTile[uuid()]!!.first }
+                        if (withContext(Dispatchers.game) { !fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt()) }) {
+                            withContext(Dispatchers.game) { sendMessage("[red]指向性传送需要拥有视野！") }
                             fail = true
                         }
                         if (fail) return@launch
-                        sendMessage("[green]选定完成..正在传送 再次点击发射台取消传送")
-                        launch(Dispatchers.game) b@{
-                            val units = buildList {
-                                Units.nearby(team(), pad.x, pad.y, itemTransferRange) {
-                                    add(it)
-                                    if (it.owner() == uuid() || it == unit())
-                                        it.apply(StatusEffects.unmoving, 10 * 60f)
+                        withContext(Dispatchers.game) { sendMessage("[green]选定完成..正在传送 再次点击发射台取消传送") }
+                        launch(Dispatchers.Default) b@{
+                            val units = withContext(Dispatchers.game) {
+                                buildList {
+                                    Units.nearby(team(), pad.x, pad.y, itemTransferRange) {
+                                        add(it)
+                                        if (it.owner() == uuid() || it == unit())
+                                            it.apply(StatusEffects.unmoving, 10 * 60f)
+                                    }
                                 }
                             }
                             repeat(10) {
-                                Call.effect(Fx.teleport, pad.x, pad.y, 0f, team().color)
-                                Call.effect(Fx.teleport, tile.worldx(), tile.worldy(), 0f, team().color)
-                                if (playerTapping[uuid()] == true || playerLastTapTile[uuid()]?.first?.build is LaunchPadBuild || team != team()) {
-                                    sendMessage("[red]取消传送！")
-                                    return@b
+                                val cancelled = withContext(Dispatchers.game) {
+                                    Call.effect(Fx.teleport, pad.x, pad.y, 0f, team().color)
+                                    Call.effect(Fx.teleport, tile.worldx(), tile.worldy(), 0f, team().color)
+                                    if (playerTapping[uuid()] == true || playerLastTapTile[uuid()]?.first?.build is LaunchPadBuild || team != team()) {
+                                        sendMessage("[red]取消传送！")
+                                        true
+                                    } else false
                                 }
+                                if (cancelled) return@b
                                 delay(1_000)
                             }
                             units.forEach {
-                                if (it.owner() == uuid() || it == unit())
-                                    launch(Dispatchers.game) {
+                                if (withContext(Dispatchers.game) { it.owner() == uuid() || it == unit() })
+                                    launch(Dispatchers.Default) {
                                         var times = 0
                                         while (true) {
-                                            Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
-
-                                            var sx = tile.worldx() + Tmp.v1.x
-                                            var sy = tile.worldy() + Tmp.v1.y
-
-                                            if (it.canPass(World.toTile(sx), World.toTile(sy))) {
-                                                while (!it.within(tile.worldx(), tile.worldy(), itemTransferRange)) {
-                                                    it.set(sx, sy)
-                                                    it.snapInterpolation()
+                                            var sx = 0f
+                                            var sy = 0f
+                                            val pass = withContext(Dispatchers.game) {
+                                                Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
+                                                sx = tile.worldx() + Tmp.v1.x
+                                                sy = tile.worldy() + Tmp.v1.y
+                                                it.canPass(World.toTile(sx), World.toTile(sy))
+                                            }
+                                            if (pass) {
+                                                while (withContext(Dispatchers.game) { !it.within(tile.worldx(), tile.worldy(), itemTransferRange) }) {
+                                                    withContext(Dispatchers.game) {
+                                                        it.set(sx, sy)
+                                                        it.snapInterpolation()
+                                                    }
                                                     delay(50L)
                                                 }
-                                                Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                withContext(Dispatchers.game) { Call.effect(Fx.teleportOut, sx, sy, 0f, team().color) }
                                                 break
                                             }
                                             if (++times > 20) {
                                                 sx = tile.worldx()
                                                 sy = tile.worldy()
-                                                while (!it.within(tile.worldx(), tile.worldy(), itemTransferRange)) {
-                                                    it.set(sx, sy)
-                                                    it.snapInterpolation()
+                                                while (withContext(Dispatchers.game) { !it.within(tile.worldx(), tile.worldy(), itemTransferRange) }) {
+                                                    withContext(Dispatchers.game) {
+                                                        it.set(sx, sy)
+                                                        it.snapInterpolation()
+                                                    }
                                                     delay(50L)
                                                 }
-                                                Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                withContext(Dispatchers.game) { Call.effect(Fx.teleportOut, sx, sy, 0f, team().color) }
                                                 break
                                             }
                                         }
-
-                                        val multiplier = if (it.team.techData().tpNoDeBuff) 1 else 4
-                                        it.apply(StatusEffects.unmoving, (it.speed() / 2f) * 5f * 60f * multiplier)
-                                        it.apply(StatusEffects.disarmed, (it.speed() / 2f) * 3.5f * 60f * multiplier)
-                                        it.apply(StatusEffects.slow, (it.speed() / 2f) * 10.5f * 60f * multiplier)
-                                        Call.effect(Fx.teleportActivate, tile.worldx(), tile.worldy(), 0f, team().color)
-                                        if (it == unit()) Call.setCameraPosition(con, tile.worldx(), tile.worldy())
+                                        withContext(Dispatchers.game) {
+                                            val multiplier = if (it.team.techData().tpNoDeBuff) 1 else 4
+                                            it.apply(StatusEffects.unmoving, (it.speed() / 2f) * 5f * 60f * multiplier)
+                                            it.apply(StatusEffects.disarmed, (it.speed() / 2f) * 3.5f * 60f * multiplier)
+                                            it.apply(StatusEffects.slow, (it.speed() / 2f) * 10.5f * 60f * multiplier)
+                                            Call.effect(Fx.teleportActivate, tile.worldx(), tile.worldy(), 0f, team().color)
+                                            if (it == unit()) Call.setCameraPosition(con, tile.worldx(), tile.worldy())
+                                        }
                                     }
                             }
                         }
@@ -4394,29 +4526,36 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                 state.teams.getActive().forEach {
                                     if (it.team == team()) return@forEach
                                     it.units.forEach {
-                                        launch(Dispatchers.game) {
+                                        launch(Dispatchers.Default) {
                                             var times = 0
-                                            var sx: Float
-                                            var sy: Float
+                                            var sx = 0f
+                                            var sy = 0f
                                             while (true) {
-                                                sx = Random.nextInt(0, world.width()) * 8f
-                                                sy = Random.nextInt(0, world.height()) * 8f
-
-                                                if (it.canPass(World.toTile(sx), World.toTile(sy))) {
-                                                    while (!it.within(sx, sy, itemTransferRange)) {
-                                                        it.set(sx, sy)
+                                                withContext(Dispatchers.game) {
+                                                    sx = Random.nextInt(0, world.width()) * 8f
+                                                    sy = Random.nextInt(0, world.height()) * 8f
+                                                }
+                                                if (withContext(Dispatchers.game) { it.canPass(World.toTile(sx), World.toTile(sy)) }) {
+                                                    while (withContext(Dispatchers.game) { !it.within(sx, sy, itemTransferRange) }) {
+                                                        withContext(Dispatchers.game) {
+                                                            it.set(sx, sy)
+                                                        }
                                                         delay(50L)
                                                     }
-                                                    Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                    withContext(Dispatchers.game) {
+                                                        Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                    }
                                                     break
                                                 }
                                                 if (++times > 20) {
                                                     break
                                                 }
                                             }
-                                            it.apply(StatusEffects.invincible, 10f * 60f)
-                                            it.apply(StatusEffects.disarmed, 45f * 60f)
-                                            if (it.isPlayer) Call.setCameraPosition(it.player.con, sx, sy)
+                                            withContext(Dispatchers.game) {
+                                                it.apply(StatusEffects.invincible, 10f * 60f)
+                                                it.apply(StatusEffects.disarmed, 45f * 60f)
+                                                if (it.isPlayer) Call.setCameraPosition(it.player.con, sx, sy)
+                                            }
                                         }
                                     }
                                 }
@@ -4445,37 +4584,51 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                 state.teams.getActive().forEach {
                                     if (it.team != team()) {
                                         it.units.forEach {
-                                            launch(Dispatchers.game) {
+                                            launch(Dispatchers.Default) {
                                                 var times = 0
-                                                val core = it.closestCore()
+                                                val core = withContext(Dispatchers.game) { it.closestCore() }
                                                 while (true) {
-                                                    Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
+                                                    var sx = 0f
+                                                    var sy = 0f
+                                                    val pass = withContext(Dispatchers.game) {
+                                                        Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
 
-                                                    var sx = core.x + Tmp.v1.x
-                                                    var sy = core.y + Tmp.v1.y
-
-                                                    if (it.canPass(World.toTile(sx), World.toTile(sy))) {
-                                                        while (!it.within(core.x, core.y, itemTransferRange)) {
-                                                            it.set(sx, sy)
+                                                        sx = core.x + Tmp.v1.x
+                                                        sy = core.y + Tmp.v1.y
+                                                        it.canPass(World.toTile(sx), World.toTile(sy))
+                                                    }
+                                                    if (pass) {
+                                                        while (withContext(Dispatchers.game) { !it.within(core.x, core.y, itemTransferRange) }) {
+                                                            withContext(Dispatchers.game) {
+                                                                it.set(sx, sy)
+                                                            }
                                                             delay(50L)
                                                         }
-                                                        Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                        withContext(Dispatchers.game) {
+                                                            Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                        }
                                                         break
                                                     }
                                                     if (++times > 20) {
                                                         sx = core.x
                                                         sy = core.y
-                                                        while (!it.within(core.x, core.y, itemTransferRange)) {
-                                                            it.set(sx, sy)
+                                                        while (withContext(Dispatchers.game) { !it.within(core.x, core.y, itemTransferRange) }) {
+                                                            withContext(Dispatchers.game) {
+                                                                it.set(sx, sy)
+                                                            }
                                                             delay(50L)
                                                         }
-                                                        Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                        withContext(Dispatchers.game) {
+                                                            Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                        }
                                                         break
                                                     }
                                                 }
-                                                it.apply(StatusEffects.unmoving, 60f * 60f)
-                                                it.apply(StatusEffects.disarmed, 60f * 60f)
-                                                if (it.isPlayer) Call.setCameraPosition(it.player.con, core.x, core.y)
+                                                withContext(Dispatchers.game) {
+                                                    it.apply(StatusEffects.unmoving, 60f * 60f)
+                                                    it.apply(StatusEffects.disarmed, 60f * 60f)
+                                                    if (it.isPlayer) Call.setCameraPosition(it.player.con, core.x, core.y)
+                                                }
                                             }
                                         }
                                     }
@@ -4516,7 +4669,7 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                         
                                     """.trimIndent()
                                 )
-                                launch(Dispatchers.game) {
+                                launch(Dispatchers.Default) {
                                     //防止玩家换队..然后下面的显示就错啦
                                     val team = team()
 
@@ -4530,23 +4683,26 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                         ) < state.rules.enemyCoreBuildRadius)
 
                                     }
-
                                     val lockDownStartTime = Time.millis()
                                     while (Time.timeSinceMillis(lockDownStartTime) <= 240_000) {
-                                        Groups.unit.forEach {
-                                            if (it.inEnemyArea()) {
-                                                if (it.isPlayer)
-                                                    Call.infoToast(
-                                                        it.player.con,
-                                                        "[red]你已经进入虚空领域！\n在你离开之前每秒受到最大生命12%伤害",
-                                                        1.013f
-                                                    )
-                                                it.health -= it.maxHealth * 0.12f
+                                        withContext(Dispatchers.game) {
+                                            Groups.unit.forEach {
+                                                if (it.inEnemyArea()) {
+                                                    if (it.isPlayer)
+                                                        Call.infoToast(
+                                                            it.player.con,
+                                                            "[red]你已经进入虚空领域！\n在你离开之前每秒受到最大生命12%伤害",
+                                                            1.013f
+                                                        )
+                                                    it.health -= it.maxHealth * 0.12f
+                                                }
                                             }
                                         }
                                         delay(1000)
                                     }
-                                    Call.sendMessage("\n[#${team.color}]${team.name}[white]的虚空领域已经失效\n")
+                                    withContext(Dispatchers.game) {
+                                        Call.sendMessage("\n[#${team.color}]${team.name}[white]的虚空领域已经失效\n")
+                                    }
                                 }
                                 accelerator.kill()
                                 achievement("[green][虚空领域！]", 100, true)
@@ -4568,7 +4724,7 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                         
                                     """.trimIndent()
                                 )
-                                launch(Dispatchers.game) {
+                                launch(Dispatchers.Default) {
                                     //防止玩家换队..然后下面的显示就错啦
                                     val team = team()
 
@@ -4582,31 +4738,34 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                         ) < state.rules.enemyCoreBuildRadius)
 
                                     }
-
                                     val lockDownStartTime = Time.millis()
                                     while (Time.timeSinceMillis(lockDownStartTime) <= 240_000) {
-                                        Groups.unit.forEach {
-                                            if (it.inEnemyArea()) {
-                                                if (it.hasEffect(StatusEffects.sporeSlowed)) {
-                                                    it.apply(StatusEffects.sapped, 10f * 60f)
+                                        withContext(Dispatchers.game) {
+                                            Groups.unit.forEach {
+                                                if (it.inEnemyArea()) {
+                                                    if (it.hasEffect(StatusEffects.sporeSlowed)) {
+                                                        it.apply(StatusEffects.sapped, 10f * 60f)
+                                                    }
+                                                    if (it.hasEffect(StatusEffects.electrified)) {
+                                                        it.apply(StatusEffects.sporeSlowed, 10f * 60f)
+                                                    }
+                                                    if (it.hasEffect(StatusEffects.slow)) {
+                                                        it.apply(StatusEffects.electrified, 10f * 60f)
+                                                    }
+                                                    if (!it.hasEffect(StatusEffects.slow) && it.isPlayer)
+                                                        Call.announce(
+                                                            it.player.con,
+                                                            "[red]你已经进入封锁区！\n在你离开之前获得大量debuff"
+                                                        )
+                                                    it.apply(StatusEffects.slow, 10f * 60f)
                                                 }
-                                                if (it.hasEffect(StatusEffects.electrified)) {
-                                                    it.apply(StatusEffects.sporeSlowed, 10f * 60f)
-                                                }
-                                                if (it.hasEffect(StatusEffects.slow)) {
-                                                    it.apply(StatusEffects.electrified, 10f * 60f)
-                                                }
-                                                if (!it.hasEffect(StatusEffects.slow) && it.isPlayer)
-                                                    Call.announce(
-                                                        it.player.con,
-                                                        "[red]你已经进入封锁区！\n在你离开之前获得大量debuff"
-                                                    )
-                                                it.apply(StatusEffects.slow, 10f * 60f)
                                             }
                                         }
                                         delay(1000)
                                     }
-                                    Call.sendMessage("\n[#${team.color}]${team.name}[white]的核心禁造区封锁已经结束\n")
+                                    withContext(Dispatchers.game) {
+                                        Call.sendMessage("\n[#${team.color}]${team.name}[white]的核心禁造区封锁已经结束\n")
+                                    }
                                 }
                                 accelerator.kill()
                                 achievement("[green][封锁！]", 100, true)
@@ -4619,80 +4778,100 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                 if (Random(gameSeed + 4).nextFloat() <= 0.5f && team().techData().void()) {
                     add("[navy]虚空闪烁\n[white]你的军团单位和你全部传送至目标点\n无敌45s并大幅加强" to suspend {
                         if (accelerator.isValid && accelerator.team == team()) {
-                            playerTapping[uuid()] = true
-                            val startTappingTime = Time.millis()
-                            var fail = false
-                            sendMessage("[yellow]对目标点点击4次来闪烁至目标点\n[lightgray]再次点击行星际发射台取消")
-                            while ((playerLastTapTile[uuid()]?.second ?: 0) < 4) {
-                                if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
-                                    sendMessage("[red]选择超时")
-                                    fail = true
-                                    break
+                            launch(Dispatchers.Default) {
+                                // 选点循环计时在 Default 线程, 每轮判定与游戏操作切回 game
+                                withContext(Dispatchers.game) {
+                                    playerTapping[uuid()] = true
+                                    sendMessage("[yellow]对目标点点击4次来闪烁至目标点\n[lightgray]再次点击行星际发射台取消")
                                 }
-                                if (playerTapping[uuid()] == false || !accelerator.isValid || accelerator.team != team()) {
-                                    sendMessage("[red]选择取消")
-                                    fail = true
-                                    break
+                                val startTappingTime = Time.millis()
+                                var fail = false
+                                while (true) {
+                                    val stop = withContext(Dispatchers.game) {
+                                        if ((playerLastTapTile[uuid()]?.second ?: 0) >= 4) true
+                                        else if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
+                                            sendMessage("[red]选择超时")
+                                            fail = true
+                                            true
+                                        } else if (playerTapping[uuid()] == false || !accelerator.isValid || accelerator.team != team()) {
+                                            sendMessage("[red]选择取消")
+                                            fail = true
+                                            true
+                                        } else false
+                                    }
+                                    if (stop) break
+                                    delay(50L)
                                 }
-                                delay(50L)
-                            }
-                            playerTapping[uuid()] = false
-                            val tile = playerLastTapTile[uuid()]!!.first
-                            if (!fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt())) {
-                                sendMessage("[red]指向性超武需要拥有视野！")
-                                fail = true
-                            }
-                            if (!fail) {
-                                Call.sendMessage(
-                                    """
+                                withContext(Dispatchers.game) { playerTapping[uuid()] = false }
+                                val tile = withContext(Dispatchers.game) { playerLastTapTile[uuid()]!!.first }
+                                if (withContext(Dispatchers.game) { !fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt()) }) {
+                                    withContext(Dispatchers.game) { sendMessage("[red]指向性超武需要拥有视野！") }
+                                    fail = true
+                                }
+                                if (!fail) {
+                                    withContext(Dispatchers.game) {
+                                        Call.sendMessage(
+                                            """
                                     
-                                    ------------------------------------------------
-                                    ${name()}[#${team().color}]使用了超级武器-虚空闪烁
+                                            ------------------------------------------------
+                                            ${name()}[#${team().color}]使用了超级武器-虚空闪烁
                                     
-                                    [white]他和他的军团单位全部传送至目标点(${tile.x},${tile.y})
-                                    无敌45s并大幅加强
-                                    ------------------------------------------------
+                                            [white]他和他的军团单位全部传送至目标点(${tile.x},${tile.y})
+                                            无敌45s并大幅加强
+                                            ------------------------------------------------
                                     
-                                """.trimIndent()
-                                )
-                                accelerator.kill()
-                                achievement("[green][虚空闪烁！]", 100, true)
-                                team().data().units.forEach {
-                                    if (it.owner() == uuid() || it == unit())
-                                        launch(Dispatchers.game) {
+                                        """.trimIndent()
+                                        )
+                                        accelerator.kill()
+                                        achievement("[green][虚空闪烁！]", 100, true)
+                                    }
+                                    val units = withContext(Dispatchers.game) {
+                                        buildList {
+                                            team().data().units.forEach {
+                                                if (it.owner() == uuid() || it == unit()) add(it)
+                                            }
+                                        }
+                                    }
+                                    units.forEach {
+                                        launch(Dispatchers.Default) {
                                             var times = 0
                                             while (true) {
-                                                Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
-
-                                                val sx = tile.worldx() + Tmp.v1.x
-                                                val sy = tile.worldy() + Tmp.v1.y
-
-                                                if (it.canPass(World.toTile(sx), World.toTile(sy))) {
-                                                    while (!it.within(
-                                                            tile.worldx(),
-                                                            tile.worldy(),
-                                                            itemTransferRange
-                                                        )
-                                                    ) {
-                                                        it.set(sx, sy)
-                                                        it.snapInterpolation()
+                                                var sx = 0f
+                                                var sy = 0f
+                                                val pass = withContext(Dispatchers.game) {
+                                                    Tmp.v1.rnd(Random.nextFloat() * itemTransferRange / 2)
+                                                    sx = tile.worldx() + Tmp.v1.x
+                                                    sy = tile.worldy() + Tmp.v1.y
+                                                    it.canPass(World.toTile(sx), World.toTile(sy))
+                                                }
+                                                if (pass) {
+                                                    while (withContext(Dispatchers.game) { !it.within(tile.worldx(), tile.worldy(), itemTransferRange) }) {
+                                                        withContext(Dispatchers.game) {
+                                                            it.set(sx, sy)
+                                                            it.snapInterpolation()
+                                                        }
                                                         delay(50L)
                                                     }
-                                                    Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                    withContext(Dispatchers.game) {
+                                                        Call.effect(Fx.teleportOut, sx, sy, 0f, team().color)
+                                                    }
                                                     break
                                                 }
                                                 if (++times > 20) {
                                                     break
                                                 }
+                                                withContext(Dispatchers.game) {
+                                                    it.apply(StatusEffects.invincible, 45f * 60f)
+                                                    it.apply(StatusEffects.boss, Float.POSITIVE_INFINITY)
+                                                    it.apply(StatusEffects.overclock, Float.POSITIVE_INFINITY)
+                                                    it.apply(StatusEffects.overdrive, Float.POSITIVE_INFINITY)
+                                                    it.apply(StatusEffects.shielded, Float.POSITIVE_INFINITY)
+                                                    it.apply(StatusEffects.burning, Float.POSITIVE_INFINITY)
+                                                    if (it == unit()) Call.setCameraPosition(con, tile.worldx(), tile.worldy())
+                                                }
                                             }
-                                            it.apply(StatusEffects.invincible, 45f * 60f)
-                                            it.apply(StatusEffects.boss, Float.POSITIVE_INFINITY)
-                                            it.apply(StatusEffects.overclock, Float.POSITIVE_INFINITY)
-                                            it.apply(StatusEffects.overdrive, Float.POSITIVE_INFINITY)
-                                            it.apply(StatusEffects.shielded, Float.POSITIVE_INFINITY)
-                                            it.apply(StatusEffects.burning, Float.POSITIVE_INFINITY)
-                                            if (it == unit()) Call.setCameraPosition(con, tile.worldx(), tile.worldy())
                                         }
+                                    }
                                 }
                             }
                         }
@@ -4700,171 +4879,109 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                 } else {
                     add("[cyan]轰击\n[white]延时对目标点造成巨大破坏" to suspend {
                         if (accelerator.isValid && accelerator.team == team()) {
-                            playerTapping[uuid()] = true
-                            val startTappingTime = Time.millis()
-                            var fail = false
-                            sendMessage("[yellow]对目标点点击4次来轰击目标点\n[lightgray]再次点击行星际发射台取消")
-                            while ((playerLastTapTile[uuid()]?.second ?: 0) < 4) {
-                                if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
-                                    sendMessage("[red]选择超时")
+                            launch(Dispatchers.Default) {
+                                // 选点循环计时在 Default 线程, 每轮判定与游戏操作切回 game
+                                withContext(Dispatchers.game) {
+                                    playerTapping[uuid()] = true
+                                    sendMessage("[yellow]对目标点点击4次来轰击目标点\n[lightgray]再次点击行星际发射台取消")
+                                }
+                                val startTappingTime = Time.millis()
+                                var fail = false
+                                while (true) {
+                                    val stop = withContext(Dispatchers.game) {
+                                        if ((playerLastTapTile[uuid()]?.second ?: 0) >= 4) true
+                                        else if (Time.timeSinceMillis(startTappingTime) >= 30_000) {
+                                            sendMessage("[red]选择超时")
+                                            fail = true
+                                            true
+                                        } else if (playerTapping[uuid()] == false || !accelerator.isValid || accelerator.team != team()) {
+                                            sendMessage("[red]选择取消")
+                                            fail = true
+                                            true
+                                        } else false
+                                    }
+                                    if (stop) break
+                                    delay(50L)
+                                }
+                                withContext(Dispatchers.game) { playerTapping[uuid()] = false }
+                                val tile = withContext(Dispatchers.game) { playerLastTapTile[uuid()]!!.first }
+                                if (withContext(Dispatchers.game) { !fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt()) }) {
+                                    withContext(Dispatchers.game) { sendMessage("[red]指向性超武需要拥有视野！") }
                                     fail = true
-                                    break
                                 }
-                                if (playerTapping[uuid()] == false || !accelerator.isValid || accelerator.team != team()) {
-                                    sendMessage("[red]选择取消")
-                                    fail = true
-                                    break
-                                }
-                                delay(50L)
-                            }
-                            playerTapping[uuid()] = false
-                            val tile = playerLastTapTile[uuid()]!!.first
-                            if (!fogControl.isVisibleTile(team(), tile.x.toInt(), tile.y.toInt())) {
-                                sendMessage("[red]指向性超武需要拥有视野！")
-                                fail = true
-                            }
-                            if (!fail) {
-                                val team = team()
-                                val startTickingTime = Time.millis()
-                                Call.sendMessage(
-                                    """
+                                if (!fail) {
+                                    val team = team()
+                                    val startTickingTime = Time.millis()
+                                    withContext(Dispatchers.game) {
+                                        Call.sendMessage(
+                                            """
                                     
-                                    ------------------------------------------------
-                                    ${name()}[#${team().color}]使用了超级武器-轰击
+                                            ------------------------------------------------
+                                            ${name()}[#${team().color}]使用了超级武器-轰击
                                     
-                                    [white]延时对目标点(${tile.x},${tile.y})造成巨大破坏！
-                                    ------------------------------------------------
+                                            [white]延时对目标点(${tile.x},${tile.y})造成巨大破坏！
+                                            ------------------------------------------------
                                     
-                                """.trimIndent()
-                                )
-                                accelerator.kill()
-                                achievement("[green][轰击！]", 100, true)
-                                while (Time.timeSinceMillis(startTickingTime) <= 10_000) {
-                                    Call.label(
-                                        "[#${team.color}]检测到在途的轰击打击!\n[white]${
-                                            (10f - Time.timeSinceMillis(
-                                                startTickingTime
-                                            ) / 1000f).format()
-                                        }", 0.513f, tile.worldx(), tile.worldy()
-                                    )
-                                    Call.effect(Fx.unitCapKill, tile.worldx(), tile.worldy(), 0f, Color.red)
-                                    Call.effect(Fx.dooropenlarge, tile.worldx(), tile.worldy(), 0f, Color.red)
-                                    repeat(8) {
-                                        Tmp.v1.rnd(Random.nextFloat() * 96f * 8f)
-                                        val sx = tile.worldx() + Tmp.v1.x
-                                        val sy = tile.worldy() + Tmp.v1.y
-                                        Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
+                                        """.trimIndent()
+                                        )
+                                        accelerator.kill()
+                                        achievement("[green][轰击！]", 100, true)
                                     }
-                                    repeat(6) {
-                                        Tmp.v1.rnd(Random.nextFloat() * 48f * 8f)
-                                        val sx = tile.worldx() + Tmp.v1.x
-                                        val sy = tile.worldy() + Tmp.v1.y
-                                        Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
+                                    while (Time.timeSinceMillis(startTickingTime) <= 10_000) {
+                                        withContext(Dispatchers.game) {
+                                            Call.label(
+                                                "[#${team.color}]检测到在途的轰击打击!\n[white]${
+                                                    (10f - Time.timeSinceMillis(
+                                                        startTickingTime
+                                                    ) / 1000f).format()
+                                                }", 0.513f, tile.worldx(), tile.worldy()
+                                            )
+                                            Call.effect(Fx.unitCapKill, tile.worldx(), tile.worldy(), 0f, Color.red)
+                                            Call.effect(Fx.dooropenlarge, tile.worldx(), tile.worldy(), 0f, Color.red)
+                                            repeat(8) {
+                                                Tmp.v1.rnd(Random.nextFloat() * 96f * 8f)
+                                                val sx = tile.worldx() + Tmp.v1.x
+                                                val sy = tile.worldy() + Tmp.v1.y
+                                                Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
+                                            }
+                                            repeat(6) {
+                                                Tmp.v1.rnd(Random.nextFloat() * 48f * 8f)
+                                                val sx = tile.worldx() + Tmp.v1.x
+                                                val sy = tile.worldy() + Tmp.v1.y
+                                                Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
+                                            }
+                                            repeat(4) {
+                                                Tmp.v1.rnd(Random.nextFloat() * 32f * 8f)
+                                                val sx = tile.worldx() + Tmp.v1.x
+                                                val sy = tile.worldy() + Tmp.v1.y
+                                                Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
+                                            }
+                                        }
+                                        delay(500)
                                     }
-                                    repeat(4) {
-                                        Tmp.v1.rnd(Random.nextFloat() * 32f * 8f)
-                                        val sx = tile.worldx() + Tmp.v1.x
-                                        val sy = tile.worldy() + Tmp.v1.y
-                                        Call.effect(Fx.regenParticle, sx, sy, 0f, team.color)
-                                    }
-                                    delay(500)
-                                }
-                                var bak = false
-                                if (state.rules.ghostBlocks) {
-                                    state.rules.ghostBlocks = false
-                                    Call.setRules(state.rules)
-                                    bak = true
-                                }
-                                Call.logicExplosion(
-                                    team,
-                                    tile.worldx(),
-                                    tile.worldy(),
-                                    96f * 8f,
-                                    50f,
-                                    true,
-                                    true,
-                                    true,
-                                    false
-                                )
-                                Call.logicExplosion(
-                                    Team.derelict,
-                                    tile.worldx(),
-                                    tile.worldy(),
-                                    48f * 8f,
-                                    500f,
-                                    true,
-                                    true,
-                                    false,
-                                    false
-                                )
-                                Call.logicExplosion(
-                                    Team.derelict,
-                                    tile.worldx(),
-                                    tile.worldy(),
-                                    32f * 8f,
-                                    2000f,
-                                    true,
-                                    true,
-                                    false,
-                                    false
-                                )
-                                Call.logicExplosion(
-                                    Team.derelict,
-                                    tile.worldx(),
-                                    tile.worldy(),
-                                    12f * 8f,
-                                    5000f,
-                                    true,
-                                    true,
-                                    false,
-                                    false
-                                )
-                                Call.logicExplosion(
-                                    Team.derelict,
-                                    tile.worldx(),
-                                    tile.worldy(),
-                                    6f * 8f,
-                                    32000f,
-                                    true,
-                                    true,
-                                    false,
-                                    false
-                                )
-                                Call.soundAt(Sounds.explosion, tile.worldx(), tile.worldy(), 114514f, 0f)
-                                Call.effect(Fx.impactReactorExplosion, tile.worldx(), tile.worldy(), 0f, team.color)
-                                var delayTime: Long
-                                delayTime = Random.nextLong(20, 100)
-                                Call.label(
-                                    "[#${team.color}]检测到在途的轰击打击!\n[white]200/200",
-                                    delayTime / 1000f * 1.2f,
-                                    tile.worldx(),
-                                    tile.worldy()
-                                )
-                                repeat(200) {
-                                    delay(delayTime)
-                                    launch(Dispatchers.game) {
-                                        Tmp.v1.rnd(Random.nextFloat() * 96f * 8f)
-                                        val sx = tile.worldx() + Tmp.v1.x
-                                        val sy = tile.worldy() + Tmp.v1.y
-                                        Call.effect(Fx.instBomb, sx, sy, 0f, team.color)
-                                        Call.soundAt(Sounds.blockPlace1, sx, sy, 3f, 0f)
-                                        delay(Random.nextLong(1_000, 2_000))
+                                    var bak = false
+                                    withContext(Dispatchers.game) {
+                                        if (state.rules.ghostBlocks) {
+                                            state.rules.ghostBlocks = false
+                                            Call.setRules(state.rules)
+                                            bak = true
+                                        }
                                         Call.logicExplosion(
-                                            Team.derelict,
-                                            sx,
-                                            sy,
-                                            32f * 8f,
-                                            200f,
+                                            team,
+                                            tile.worldx(),
+                                            tile.worldy(),
+                                            96f * 8f,
+                                            50f,
                                             true,
                                             true,
-                                            false,
+                                            true,
                                             false
                                         )
                                         Call.logicExplosion(
                                             Team.derelict,
-                                            sx,
-                                            sy,
-                                            12f * 8f,
+                                            tile.worldx(),
+                                            tile.worldy(),
+                                            48f * 8f,
                                             500f,
                                             true,
                                             true,
@@ -4873,29 +4990,118 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                                         )
                                         Call.logicExplosion(
                                             Team.derelict,
-                                            sx,
-                                            sy,
-                                            6f * 8f,
-                                            1500f,
+                                            tile.worldx(),
+                                            tile.worldy(),
+                                            32f * 8f,
+                                            2000f,
                                             true,
                                             true,
                                             false,
                                             false
                                         )
-                                        Call.soundAt(Sounds.explosion, tile.worldx(), tile.worldy(), 1.5f, 0f)
-                                        Call.effect(Fx.greenBomb, sx, sy, 0f, team.color)
+                                        Call.logicExplosion(
+                                            Team.derelict,
+                                            tile.worldx(),
+                                            tile.worldy(),
+                                            12f * 8f,
+                                            5000f,
+                                            true,
+                                            true,
+                                            false,
+                                            false
+                                        )
+                                        Call.logicExplosion(
+                                            Team.derelict,
+                                            tile.worldx(),
+                                            tile.worldy(),
+                                            6f * 8f,
+                                            32000f,
+                                            true,
+                                            true,
+                                            false,
+                                            false
+                                        )
+                                        Call.soundAt(Sounds.explosion, tile.worldx(), tile.worldy(), 114514f, 0f)
+                                        Call.effect(Fx.impactReactorExplosion, tile.worldx(), tile.worldy(), 0f, team.color)
                                     }
+                                    var delayTime: Long
                                     delayTime = Random.nextLong(20, 100)
-                                    Call.label(
-                                        "[#${team.color}]检测到在途的轰击打击!\n[white]${200 - it}/200",
-                                        delayTime / 1000f * 1.2f,
-                                        tile.worldx(),
-                                        tile.worldy()
-                                    )
-                                }
-                                if (bak) {
-                                    state.rules.ghostBlocks = true
-                                    Call.setRules(state.rules)
+                                    withContext(Dispatchers.game) {
+                                        Call.label(
+                                            "[#${team.color}]检测到在途的轰击打击!\n[white]200/200",
+                                            delayTime / 1000f * 1.2f,
+                                            tile.worldx(),
+                                            tile.worldy()
+                                        )
+                                    }
+                                    repeat(200) {
+                                        delay(delayTime)
+                                        launch(Dispatchers.Default) {
+                                            // sx/sy 需在两个 withContext 段之间共享, 故声明在 launch 作用域
+                                            var sx = 0f
+                                            var sy = 0f
+                                            withContext(Dispatchers.game) {
+                                                Tmp.v1.rnd(Random.nextFloat() * 96f * 8f)
+                                                sx = tile.worldx() + Tmp.v1.x
+                                                sy = tile.worldy() + Tmp.v1.y
+                                                Call.effect(Fx.instBomb, sx, sy, 0f, team.color)
+                                                Call.soundAt(Sounds.blockPlace1, sx, sy, 3f, 0f)
+                                            }
+                                            delay(Random.nextLong(1_000, 2_000))
+                                            withContext(Dispatchers.game) {
+                                                Call.logicExplosion(
+                                                    Team.derelict,
+                                                    sx,
+                                                    sy,
+                                                    32f * 8f,
+                                                    200f,
+                                                    true,
+                                                    true,
+                                                    false,
+                                                    false
+                                                )
+                                                Call.logicExplosion(
+                                                    Team.derelict,
+                                                    sx,
+                                                    sy,
+                                                    12f * 8f,
+                                                    500f,
+                                                    true,
+                                                    true,
+                                                    false,
+                                                    false
+                                                )
+                                                Call.logicExplosion(
+                                                    Team.derelict,
+                                                    sx,
+                                                    sy,
+                                                    6f * 8f,
+                                                    1500f,
+                                                    true,
+                                                    true,
+                                                    false,
+                                                    false
+                                                )
+                                                Call.soundAt(Sounds.explosion, tile.worldx(), tile.worldy(), 1.5f, 0f)
+                                                Call.effect(Fx.greenBomb, sx, sy, 0f, team.color)
+                                            }
+                                        }
+                                        delayTime = Random.nextLong(20, 100)
+                                        withContext(Dispatchers.game) {
+                                            Call.label(
+                                                "[#${team.color}]检测到在途的轰击打击!\n[white]${200 - it}/200",
+                                                delayTime / 1000f * 1.2f,
+                                                tile.worldx(),
+                                                tile.worldy()
+                                            )
+                                        }
+                                    }
+                                    if (bak) {
+                                        withContext(Dispatchers.game) {
+                                            state.rules.ghostBlocks = true
+                                            Call.setRules(state.rules)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -5022,55 +5228,69 @@ suspend fun Player.superWeaponsMenu(accelerator: AcceleratorBuild) {
                     if (state.rules.fog)
                         add("[cyan]影鬼\n[white]队伍攻击翻倍\n持续180s" to suspend {
                             if (accelerator.isValid && accelerator.team == team() && state.rules.fog) {
-                                team().rules().unitDamageMultiplier *= 2f
-                                team().rules().blockDamageMultiplier *= 2f
-                                Call.setRules(state.rules)
-                                Call.sendMessage(
-                                    """
+                                launch(Dispatchers.Default) {
+                                    // 计时在 Default 线程, 增幅与恢复的游戏数据操作切回 game
+                                    val team = withContext(Dispatchers.game) {
+                                        team().rules().unitDamageMultiplier *= 2f
+                                        team().rules().blockDamageMultiplier *= 2f
+                                        Call.setRules(state.rules)
+                                        Call.sendMessage(
+                                            """
                                             
-                                            ------------------------------------------------
-                                            ${name()}[#${team().color}]使用了超级武器-影鬼
+                                                    ------------------------------------------------
+                                                    ${name()}[#${team().color}]使用了超级武器-影鬼
                                             
-                                            [white]队伍单位攻击 ${(team().rules().unitDamageMultiplier / 2f).format()} -> ${team().rules().unitDamageMultiplier.format()}
-                                            队伍建筑攻击 ${(team().rules().blockDamageMultiplier / 2f).format()} -> ${team().rules().blockDamageMultiplier.format()}
-                                            持续180s!
-                                            ------------------------------------------------
+                                                    [white]队伍单位攻击 ${(team().rules().unitDamageMultiplier / 2f).format()} -> ${team().rules().unitDamageMultiplier.format()}
+                                                    队伍建筑攻击 ${(team().rules().blockDamageMultiplier / 2f).format()} -> ${team().rules().blockDamageMultiplier.format()}
+                                                    持续180s!
+                                                    ------------------------------------------------
                                             
-                                        """.trimIndent()
-                                )
-                                accelerator.kill()
-                                achievement("[green][影鬼！]", 100, true)
-                                val team = team()
-                                delay(180_000)
-                                team.rules().unitDamageMultiplier /= 2f
-                                team.rules().blockDamageMultiplier /= 2f
-                                Call.sendMessage("\n[#${team.color}]${team.name}[white]的影鬼攻击增幅已经结束\n")
+                                                """.trimIndent()
+                                        )
+                                        accelerator.kill()
+                                        achievement("[green][影鬼！]", 100, true)
+                                        team()
+                                    }
+                                    delay(180_000)
+                                    withContext(Dispatchers.game) {
+                                        team.rules().unitDamageMultiplier /= 2f
+                                        team.rules().blockDamageMultiplier /= 2f
+                                        Call.sendMessage("\n[#${team.color}]${team.name}[white]的影鬼攻击增幅已经结束\n")
+                                    }
+                                }
                             }
                         })
                     else if (team().techData().void())
                         add("[navy]虚空之灵\n[white]队伍建筑血量翻5倍120s" to {
                             if (accelerator.isValid && accelerator.team == team()) {
-                                team().rules().blockHealthMultiplier *= 5f
-                                Call.setRules(state.rules)
-                                Call.sendMessage(
-                                    """
+                                launch(Dispatchers.Default) {
+                                    // 计时在 Default 线程, 增幅与恢复的游戏数据操作切回 game
+                                    val team = withContext(Dispatchers.game) {
+                                        team().rules().blockHealthMultiplier *= 5f
+                                        Call.setRules(state.rules)
+                                        Call.sendMessage(
+                                            """
                                             
-                                            ------------------------------------------------
-                                            ${name()}[#${team().color}]使用了超级武器-虚空之灵
+                                                    ------------------------------------------------
+                                                    ${name()}[#${team().color}]使用了超级武器-虚空之灵
                                             
-                                            队伍建筑血量 ${(team().rules().blockHealthMultiplier / 5f).format()} -> ${team().rules().blockHealthMultiplier.format()}
-                                            持续120s!
-                                            ------------------------------------------------
+                                                    队伍建筑血量 ${(team().rules().blockHealthMultiplier / 5f).format()} -> ${team().rules().blockHealthMultiplier.format()}
+                                                    持续120s!
+                                                    ------------------------------------------------
                                             
-                                        """.trimIndent()
-                                )
-                                accelerator.kill()
-                                achievement("[green][虚空之灵！]", 100, true)
-                                val team = team()
-                                delay(120_000)
-                                team.rules().blockHealthMultiplier /= 5f
-                                Call.setRules(state.rules)
-                                Call.sendMessage("\n[#${team.color}]${team.name}[white]的虚空之灵血量增幅已经结束\n")
+                                                """.trimIndent()
+                                        )
+                                        accelerator.kill()
+                                        achievement("[green][虚空之灵！]", 100, true)
+                                        team()
+                                    }
+                                    delay(120_000)
+                                    withContext(Dispatchers.game) {
+                                        team.rules().blockHealthMultiplier /= 5f
+                                        Call.setRules(state.rules)
+                                        Call.sendMessage("\n[#${team.color}]${team.name}[white]的虚空之灵血量增幅已经结束\n")
+                                    }
+                                }
                             }
                         })
                 })
@@ -5114,18 +5334,23 @@ listen<EventType.PlayerChatEvent> {
 }
 
 listen<EventType.PlayerLeave> {
-    launch(Dispatchers.game) {
+    launch(Dispatchers.Default) {
         val leaveTime = Time.millis()
         val uuid = it.player.uuid()
         val team = it.player.team()
-        while (!Groups.player.any { p -> p.uuid() == uuid }) {
-            if (Time.timeSinceMillis(leaveTime) >= 30_000) {
-                if (playerCoins[uuid] > 0) {
-                    team.addCoin(playerCoins[uuid])
-                    playerCoins.put(uuid, 0)
-                }
-                break
+        while (true) {
+            // 玩家消失则等待其回来(最多30s), 计时在 Default 线程, 到期动作用 withContext 回主线程
+            val exit = withContext(Dispatchers.game) {
+                if (Groups.player.any { p -> p.uuid() == uuid }) true
+                else if (Time.timeSinceMillis(leaveTime) >= 30_000) {
+                    if (playerCoins[uuid] > 0) {
+                        team.addCoin(playerCoins[uuid])
+                        playerCoins.put(uuid, 0)
+                    }
+                    true
+                } else false
             }
+            if (exit) break
             delay(1_000L)
         }
     }
@@ -5176,12 +5401,15 @@ listen<EventType.UnitDamageEvent> { e ->
 }
 
 listen<EventType.UnitDestroyEvent> {
+    val deadOwner = it.unit.owner()
+    // 先取出领主再清理, 供下面的回生逻辑复用
+    unitOwner.remove(it.unit) // 单位已销毁: 清理领主映射(长跑防泄漏)
     if (it.unit.team.techData().deadIsntDead > Time.millis() || (it.unit.team.techData().deadIsntDeadProbability && Random.nextFloat() <= 0.25f) && it.unit.type !in LordUnits && it.unit.type.playerControllable && !it.unit.spawnedByCore) {
         var times = 0
         val spawnRadius = 5
         val core = it.unit.closestCore()
         val unit = it.unit.type.create(it.unit.team)
-        val uuid = it.unit.owner()
+        val uuid = deadOwner
         while (true) {
             Tmp.v1.rnd(spawnRadius.toFloat() * tilesize)
 
@@ -5209,13 +5437,17 @@ listen<EventType.UnitDestroyEvent> {
         }
     }
     if (it.unit.team.techData().deadBoom) {
-        launch(Dispatchers.game) {
+        launch(Dispatchers.Default) {
             val unit = it.unit
             repeat(Random.nextInt(3, 10)) {
                 delay(Random.nextLong(500, 800))
-                Call.effect(Fx.explosion, unit.x, unit.y, 0f, Color.red)
+                withContext(Dispatchers.game) {
+                    Call.effect(Fx.explosion, unit.x, unit.y, 0f, Color.red)
+                }
             }
-            Call.logicExplosion(unit.team, unit.x, unit.y, 8f * 8f, unit.maxHealth / 10, true, true, true, false)
+            withContext(Dispatchers.game) {
+                Call.logicExplosion(unit.team, unit.x, unit.y, 8f * 8f, unit.maxHealth / 10, true, true, true, false)
+            }
         }
     }
 }
@@ -5233,8 +5465,8 @@ listenPacket2Server<UnitControlCallPacket> { con, packet ->
             )
             unit.team.techData().controlOtherPlayerUnits && unit.type !in LordUnits
         } else {
-            launch(Dispatchers.game) {
-                while (!unit.isPlayer) {
+            launch(Dispatchers.Default) {
+                while (withContext(Dispatchers.game) { !unit.isPlayer }) {
                     delay(50L)
                 }
                 val effects = listOf(
@@ -5244,17 +5476,21 @@ listenPacket2Server<UnitControlCallPacket> { con, packet ->
                     StatusEffects.overdrive,
                 )
                 val hadEffects = effects.toMutableList()
-                while (unit.isPlayer) {
-                    hadEffects.removeIf { !unit.hasEffect(it) }
-                    effects.filter { it !in hadEffects }.forEach {
-                        unit.apply(it, 2 * 60f)
+                while (withContext(Dispatchers.game) { unit.isPlayer }) {
+                    withContext(Dispatchers.game) {
+                        hadEffects.removeIf { !unit.hasEffect(it) }
+                        effects.filter { it !in hadEffects }.forEach {
+                            unit.apply(it, 2 * 60f)
+                        }
+                        if (unit.team().techData().cycloneEngine)
+                            unit.apply(StatusEffects.fast, 24 * 60f)
                     }
-                    if (unit.team().techData().cycloneEngine)
-                        unit.apply(StatusEffects.fast, 24 * 60f)
                     delay(50L)
                 }
-                effects.filter { it !in hadEffects }.forEach {
-                    unit.unapply(it)
+                withContext(Dispatchers.game) {
+                    effects.filter { it !in hadEffects }.forEach {
+                        unit.unapply(it)
+                    }
                 }
             }
             true

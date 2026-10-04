@@ -34,24 +34,32 @@ DBApi.registerTable(PlayerUidTable)
 /** 分配 uid(同步,若已分配则返回已有值) */
 fun assignUid(uuid: String): Int {
     uidCache[uuid]?.let { return it }
-    return transaction {
-        // 再次检查(防止并发重复分配)
-        PlayerUidTable.select(PlayerUidTable.id).where { PlayerUidTable.uuid eq uuid }
-            .firstOrNull()?.let { it[PlayerUidTable.id].value }
-            ?: run {
-                val maxUid = PlayerUidTable.selectAll().maxOfOrNull { it[PlayerUidTable.id].value } ?: 0
-                val newUid = maxUid + 1
-                PlayerUidTable.insert {
-                    it[PlayerUidTable.uuid] = uuid
-                    it[PlayerUidTable.firstJoin] = Instant.now()
-                    it[PlayerUidTable.id] = newUid
+    val uid = try {
+        transaction {
+            // 再次检查(防止并发重复分配)
+            PlayerUidTable.select(PlayerUidTable.id).where { PlayerUidTable.uuid eq uuid }
+                .firstOrNull()?.let { it[PlayerUidTable.id].value }
+                ?: run {
+                    val maxUid = PlayerUidTable.selectAll().maxOfOrNull { it[PlayerUidTable.id].value } ?: 0
+                    val newUid = maxUid + 1
+                    PlayerUidTable.insert {
+                        it[PlayerUidTable.uuid] = uuid
+                        it[PlayerUidTable.firstJoin] = Instant.now()
+                        it[PlayerUidTable.id] = newUid
+                    }
+                    newUid
                 }
-                newUid
-            }
-    }.also {
-        uidCache[uuid] = it
-        uuidCache[it] = uuid
+        }
+    } catch (e: Exception) {
+        // max+1 并发撞主键/唯一键(预加载与 PlayerJoin 同时分配): 回查该 uuid 已插入的 uid 返回
+        transaction {
+            PlayerUidTable.select(PlayerUidTable.id).where { PlayerUidTable.uuid eq uuid }
+                .firstOrNull()?.let { it[PlayerUidTable.id].value }
+        } ?: throw e
     }
+    uidCache[uuid] = uid
+    uuidCache[uid] = uuid
+    return uid
 }
 
 // 数据库就绪后预加载全部缓存,并为在线玩家分配 uid

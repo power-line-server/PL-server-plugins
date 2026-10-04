@@ -34,6 +34,7 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.withContext
 
 name = "游戏信息查看"
 
@@ -342,11 +343,13 @@ listen<EventType.GameOverEvent> { event ->
     lastInsertedRecordId = recordId
 
     // 延迟 1 秒后广播含菜单按钮的消息
-    launch(Dispatchers.game) {
+    launch(Dispatchers.Default) {
         delay(1000)
-        Groups.player.forEach { p ->
-            if (p.uuid() !in ignoredPlayers) {
-                launch { sendGameOverBroadcast(p, recordId) }
+        withContext(Dispatchers.game) {
+            Groups.player.forEach { p ->
+                if (p.uuid() !in ignoredPlayers) {
+                    launch { sendGameOverBroadcast(p, recordId) }
+                }
             }
         }
     }

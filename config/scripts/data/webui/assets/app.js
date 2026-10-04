@@ -457,7 +457,7 @@
           // 返回永不 resolve 的 promise，阻止后续 catch 执行错误显示
           return new Promise(function () {});
         }
-        var err = new Error('未授权或会话已过期');
+        var err = new Error(WebUI.t('webui.error.sessionExpired', '未授权或会话已过期'));
         err.code = 401;
         throw err;
       }
@@ -472,7 +472,8 @@
         return resp.json().then(function (data) {
           if (data && typeof data === 'object' && 'code' in data) {
             if (data.code !== 0 && data.code !== 200) {
-              var e = new Error(localizeError(data.msg) || ('请求失败 code=' + data.code));
+              var e = new Error(localizeError(data.msg) ||
+                WebUI.t('webui.error.requestFailed', '请求失败 code={code}').replace('{code}', data.code));
               e.code = data.code;
               e.data = data.data;
               throw e;
@@ -549,6 +550,12 @@
       var ae = altNodes[a0];
       var av = t(ae.getAttribute('data-i18n-alt'), null);
       if (av !== null) ae.setAttribute('alt', av);
+    }
+    var ariaNodes = document.querySelectorAll('[data-i18n-aria-label]');
+    for (var r0 = 0; r0 < ariaNodes.length; r0++) {
+      var ra = ariaNodes[r0];
+      var rv = t(ra.getAttribute('data-i18n-aria-label'), null);
+      if (rv !== null) ra.setAttribute('aria-label', rv);
     }
   }
 
@@ -640,10 +647,10 @@
   function topbarHtml(titleKey, titleText) {
     var themeIcon = getTheme() === 'dark' ? 'sun' : 'moon';
     return '<button class="btn btn-link btn-sm d-lg-none" id="menuToggle" type="button" ' +
-      'data-bs-toggle="offcanvas" data-bs-target="#appOffcanvas" aria-label="菜单">' + icon('menu', 20) + '</button>' +
+      'data-bs-toggle="offcanvas" data-bs-target="#appOffcanvas" data-i18n-aria-label="webui.topbar.menu" aria-label="菜单">' + icon('menu', 20) + '</button>' +
       '<h1 class="topbar-title" data-i18n="' + titleKey + '">' + titleText + '</h1>' +
       '<div class="topbar-actions">' +
-        '<button class="btn btn-link btn-sm theme-toggle" id="themeToggle" title="切换主题">' + icon(themeIcon, 18) + '</button>' +
+        '<button class="btn btn-link btn-sm theme-toggle" id="themeToggle" data-i18n-title="webui.topbar.themeToggle" title="切换主题">' + icon(themeIcon, 18) + '</button>' +
         '<div class="dropdown">' +
           '<button class="btn btn-link btn-sm dropdown-toggle" data-bs-toggle="dropdown">' + icon('globe', 18) + '</button>' +
           '<ul class="dropdown-menu dropdown-menu-end" id="langMenu">' +
@@ -689,7 +696,7 @@
     // 游客模式: 无 token 仅允许仪表盘(游客无需登录自动降级), 其他页面跳登录
     if (!hasToken && pageName !== 'dashboard') {
       location.href = 'login.html';
-      return Promise.reject(new Error('未登录'));
+      return Promise.reject(new Error(WebUI.t('webui.error.notLoggedIn', '未登录')));
     }
     // 加载当前用户信息(权限), 无 token 且游客禁用时 /api/me 返回 401 由 request() 跳登录
     return loadMe().catch(function (err) {
@@ -758,10 +765,13 @@
     var h = Math.floor((seconds % 86400) / 3600);
     var m = Math.floor((seconds % 3600) / 60);
     var s = Math.floor(seconds % 60);
-    if (d > 0) return d + '天 ' + h + '时 ' + m + '分';
-    if (h > 0) return h + '时 ' + m + '分 ' + s + '秒';
-    if (m > 0) return m + '分 ' + s + '秒';
-    return s + '秒';
+    // 单位走语言包, 避免非中文界面出现"天/时/分/秒"
+    // 注意: 必须保持 WebUI.t 后直接跟字符串字面量的写法, 否则 langSync 扫描不到会把 key 当"未引用"删除
+    var fill = function (text, n) { return String(text).replace('{n}', n); };
+    if (d > 0) return fill(WebUI.t('webui.time.day', '{n}天'), d) + ' ' + fill(WebUI.t('webui.time.hour', '{n}时'), h) + ' ' + fill(WebUI.t('webui.time.minute', '{n}分'), m);
+    if (h > 0) return fill(WebUI.t('webui.time.hour', '{n}时'), h) + ' ' + fill(WebUI.t('webui.time.minute', '{n}分'), m) + ' ' + fill(WebUI.t('webui.time.second', '{n}秒'), s);
+    if (m > 0) return fill(WebUI.t('webui.time.minute', '{n}分'), m) + ' ' + fill(WebUI.t('webui.time.second', '{n}秒'), s);
+    return fill(WebUI.t('webui.time.second', '{n}秒'), s);
   }
   // 防抖: 延迟执行, 多次调用只执行最后一次
   function debounce(fn, delay) {

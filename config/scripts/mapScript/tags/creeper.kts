@@ -1,6 +1,7 @@
 package mapScript.tags
 
 import cf.wayzer.placehold.PlaceHoldApi.with
+import cf.wayzer.scriptAgent.Config
 import coreLibrary.lib.util.loop
 import mindustry.Vars.state
 import mindustry.Vars.world
@@ -109,6 +110,15 @@ private var markGen = 0
 // 并行转出表(每格4槽: 邻居key或-1, 对应delta)
 private var outTarget = IntArray(0)
 private var outDelta = FloatArray(0)
+// applyChanges 复用缓冲区(每次调用清空复用, 换图/Reset 时清理, 避免跨局残留与反复分配)
+private var tierPos = emptyArray<IntArray>() // 每档待广播位置(按需扩容, 容量跨 tick 保留)
+private var tierSizes = IntArray(0) // 每档当前位置数
+private val unitTiles = HashMap<Int, Unit>() // 本 tick 有单位(非水源队/非飞行)的格
+private val damagedBuilds = HashSet<Building>() // 本 tick 已伤害建筑(多格去重)
+private var maskMark = IntArray(0) // refreshDynamicReachable 去重标记
+private var maskGen = 0
+private var sourceKeyBuf = IntArray(0) // 泉源格 key 快照(game 线程写入, Default 线程读取)
+private var sourceKeyCount = 0
 private val floodWalls = mutableSetOf<Int>() // 已放置洪水墙的 tile.array()
 private val backupBlocks = mutableMapOf<Int, Block>() // 被覆盖的装饰块, 还原恢复
 private val upgradingKeys = mutableSetOf<Int>() // 本 tick 升降档的 key, 降级监听忽略其 remove
@@ -196,16 +206,27 @@ private fun refreshDynamicReachable() {
     if (disabling) return
     val w = world.width()
     val h = world.height()
+    if (++maskGen <= 0) { // Int 溢出保护(约 2^31 tick 才会触发)
+        maskMark.fill(0)
+        maskGen = 1
+    }
     val n0 = activeSize
     for (i in 0 until n0) {
         val k = activeQueue[i]
         val x = k % w
         val y = k / w
-        if (x + 1 < w) reachable[k + 1] = if (computeReachable(k + 1)) 1 else 0
-        if (x - 1 >= 0) reachable[k - 1] = if (computeReachable(k - 1)) 1 else 0
-        if (y + 1 < h) reachable[k + w] = if (computeReachable(k + w)) 1 else 0
-        if (y - 1 >= 0) reachable[k - w] = if (computeReachable(k - w)) 1 else 0
+        if (x + 1 < w) refreshReachableOnce(k + 1)
+        if (x - 1 >= 0) refreshReachableOnce(k - 1)
+        if (y + 1 < h) refreshReachableOnce(k + w)
+        if (y - 1 >= 0) refreshReachableOnce(k - w)
     }
+}
+
+/** 同一 tick 内同格只重算一次(computeReachable 只读 tile, 幂等, 结果与逐次重算一致) */
+private fun refreshReachableOnce(k: Int) {
+    if (maskMark[k] == maskGen) return
+    maskMark[k] = maskGen
+    reachable[k] = if (computeReachable(k)) 1 else 0
 }
 
 // ===== 主循环 =====
@@ -225,6 +246,14 @@ onEnable {
     visitedMark = IntArray(size)
     outTarget = IntArray(0)
     outDelta = FloatArray(0)
+    tierPos = Array(defenseWalls.size) { IntArray(64) }
+    tierSizes = IntArray(defenseWalls.size)
+    unitTiles.clear()
+    damagedBuilds.clear()
+    maskMark = IntArray(size)
+    maskGen = 0
+    sourceKeyBuf = IntArray(0)
+    sourceKeyCount = 0
     activeSize = 0
     markGen = 0
     frame = 0
@@ -238,17 +267,23 @@ onEnable {
     loop(Dispatchers.Default) {
         delay(tickDelay())
         if (disabling) return@loop
-        // 尊重游戏暂停(终端 pause on / 关卡暂停/结束): 模拟同步暂停
-        if (!state.isPlaying || state.isPaused) return@loop
-        // 调试暂停/步进: simPaused 时只允许 stepRequested 计数执行
-        if (simPaused && stepRequested <= 0) return@loop
-        if (stepRequested > 0) stepRequested--
+        // 主线程段: 只做必须读游戏数据的部分(暂停判定/泉源收集/邻域掩码自愈/配置快照)
+        val env = withContext(Dispatchers.game) {
+            // 尊重游戏暂停(终端 pause on / 关卡暂停/结束): 模拟同步暂停
+            if (!state.isPlaying || state.isPaused) return@withContext null
+            // 调试暂停/步进: simPaused 时只允许 stepRequested 计数执行
+            if (simPaused && stepRequested <= 0) return@withContext null
+            if (stepRequested > 0) stepRequested--
+            if (frame++ % 4 == 0) collectSources()
+            refreshDynamicReachable() // 动态刷新活跃格邻域可达性(墙摧毁/新建后掩码自愈)
+            snapshotSources()
+            FlowEnv(
+                world.width(), world.height(), viscosity, evaporation,
+                CAP * (emitAmount / 20f).coerceIn(0f, 1f), ticksPerSecond, maxTiles, sourceKeyCount
+            )
+        } ?: return@loop
         runCatching {
-            withContext(Dispatchers.game) {
-                if (frame++ % 4 == 0) collectSources()
-                refreshDynamicReachable() // 动态刷新活跃格邻域可达性(墙摧毁/新建后掩码自愈)
-            }
-            flow() // Default 线程: 纯数组并行流体, 不碰世界
+            flow(env) // Default 线程: 纯数组并行流体, 不碰世界/单位数据
             withContext(Dispatchers.game) { applyChanges() }
         }.onFailure { logger.warning("[creeper] 主循环异常: ${it.stackTraceToString()}") }
     }
@@ -262,24 +297,40 @@ private fun collectSources() {
     }
 }
 
+/** 主线程快照泉源格 key(Default 线程只读快照, 不直接触碰 Building) */
+private fun snapshotSources() {
+    if (sourceKeyBuf.size < sources.size) sourceKeyBuf = IntArray(sources.size)
+    sourceKeyCount = 0
+    for (src in sources) sourceKeyBuf[sourceKeyCount++] = src.tile.array()
+}
+
+/** 每 tick 流体计算的环境快照(game 线程读取, Default 线程只读使用) */
+private class FlowEnv(
+    val width: Int,
+    val height: Int,
+    val visc: Float,
+    val evap: Float,
+    val sourceCap: Float,
+    val tps: Int,
+    val maxTiles: Int,
+    val sourceCount: Int,
+)
+
 // ===== 粘稠流体流动(并行: 每段协程只读 fluid 算转出, 主协程统一写回; 守恒, 无竞态) =====
-private suspend fun flow() {
-    val width = world.width()
-    val height = world.height()
+private suspend fun flow(env: FlowEnv) {
+    val width = env.width
+    val height = env.height
     markGen++
-    val visc = viscosity
-    val evap = evaporation
+    val visc = env.visc
+    val evap = env.evap
 
     // 1. 泉源每 tick 钳到目标水位(CreeperWorld 泉眼: 恒定高水位, 水持续流向邻域)
     //    emit=20 -> 源头满100(碳化物), 10 -> 50, 4 -> 20
     //    (钳回是补满到目标, 配合 MAX_OUT 严格缩放 -> 源头恒满、水持续外流, 无脉冲)
-    val sourceCap = CAP * (emitAmount / 20f).coerceIn(0f, 1f)
-    val sourceKeys = HashSet<Int>()
-    for (src in sources) {
-        val srcKey = src.tile.array()
+    for (i in 0 until env.sourceCount) {
+        val srcKey = sourceKeyBuf[i]
         if (srcKey < fluid.size) {
-            fluid[srcKey] = sourceCap
-            sourceKeys.add(srcKey)
+            fluid[srcKey] = env.sourceCap
             activate(srcKey)
         }
     }
@@ -398,7 +449,7 @@ private suspend fun flow() {
             val k = activeQueue[i]
             val f = fluid[k]
             if (f <= 0f) continue
-            fluid[k] = (f - evap / ticksPerSecond).coerceAtLeast(0f)
+            fluid[k] = (f - evap / env.tps).coerceAtLeast(0f)
         }
     }
 
@@ -411,7 +462,7 @@ private suspend fun flow() {
     activeSize = w
 
     // 6. 上限裁剪
-    if (maxTiles > 0 && activeSize > maxTiles) trimLowest(activeSize - maxTiles)
+    if (env.maxTiles > 0 && activeSize > env.maxTiles) trimLowest(activeSize - env.maxTiles)
 }
 
 private fun activate(key: Int) {
@@ -437,8 +488,7 @@ private fun activeTiers(): List<Block> = defenseWalls.take(wallTierCount.coerceI
 private fun tierIndex(block: Block): Int = activeTiers().indexOf(block)
 
 /** 计算目标档位(滞回): 升档需超上边界+滞回, 降档需低下边界-滞回 */
-private fun tierForFluid(k: Int, f: Float): Int {
-    val tiers = activeTiers()
+private fun tierForFluid(tiers: List<Block>, k: Int, f: Float): Int {
     val cur = tierMap[k].toInt()
     val want = (f * tiers.size / CAP).toInt().coerceIn(0, tiers.size - 1)
     if (cur < 0) return want // 无墙直接按当前流体设档
@@ -461,13 +511,13 @@ private fun applyChanges() {
     val w = world.width()
     val team = creeperTeams.first()
     val tiers = activeTiers()
-    val tierPos = Array(tiers.size) { IntArray(64) }
-    val tierSizes = IntArray(tiers.size)
+    // 复用文件级缓冲区: 只清空不重新分配(容量跨 tick 保留, 换图/Reset 时统一清理)
+    for (ti in tierSizes.indices) tierSizes[ti] = 0
     var newWalls = 0
 
     // 单位位置索引: 放墙跳过有单位(非水源队)的格, 避免墙生成在单位脚下把单位挤爆
     // (单位在水里受 unitDamage 伤害, 而不是被墙压死)
-    val unitTiles = HashMap<Int, Unit>()
+    unitTiles.clear()
     Groups.unit.forEach { u ->
         if (u.dead || u.team in creeperTeams || u.type.flying) return@forEach
         val uk = u.tileOn()?.array() ?: return@forEach
@@ -483,7 +533,7 @@ private fun applyChanges() {
         val wallDmg = buildDamage * maxOf(f / CAP, MIN_DAMAGE_SCALE)
         if (wallDmg < minWallDamage) continue
         val tile = world.tile(k % w, k / w) ?: continue
-        val wantTier = tierForFluid(k, f)
+        val wantTier = tierForFluid(tiers, k, f)
         val wantBlock = tiers[wantTier]
         val curBlock = tile.block()
         val curTier = tierMap[k].toInt()
@@ -497,14 +547,14 @@ private fun applyChanges() {
             when {
                 curTier == wantTier -> {} // 档位未变, 无需发包(稳态0发包)
                 curBlock == Blocks.air -> {
-                    addTier(tierPos, tierSizes, wantTier, tile.x.toInt(), tile.y.toInt())
+                    addTier(wantTier, tile.x.toInt(), tile.y.toInt())
                     floodWalls.add(k)
                     tierMap[k] = wantTier.toByte()
                     newWalls++
                 }
                 curBlock is Prop -> {
                     backupBlocks.getOrPut(k) { curBlock }
-                    addTier(tierPos, tierSizes, wantTier, tile.x.toInt(), tile.y.toInt())
+                    addTier(wantTier, tile.x.toInt(), tile.y.toInt())
                     floodWalls.add(k)
                     tierMap[k] = wantTier.toByte()
                     newWalls++
@@ -512,7 +562,7 @@ private fun applyChanges() {
                 curBlock is Wall && tile.build?.team in creeperTeams -> {
                     // 已有洪水墙, 升降档
                     upgradingKeys.add(k)
-                    addTier(tierPos, tierSizes, wantTier, tile.x.toInt(), tile.y.toInt())
+                    addTier(wantTier, tile.x.toInt(), tile.y.toInt())
                     tierMap[k] = wantTier.toByte()
                     newWalls++
                 }
@@ -525,11 +575,11 @@ private fun applyChanges() {
     for (ti in tiers.indices) {
         val n = tierSizes[ti]
         if (n <= 0) continue
-        val pos = if (n == tierPos[ti].size) tierPos[ti] else tierPos[ti].copyOf(n)
         var offset = 0
         while (offset < n) {
             val len = minOf(MAX_POS_PER_PACKET, n - offset)
-            val chunk = pos.copyOfRange(offset, offset + len)
+            // 原版包需要精确长度数组, 此处按分片复制(复用缓冲无法直接传入)
+            val chunk = tierPos[ti].copyOfRange(offset, offset + len)
             Call.setTileBlocks(tiers[ti], team, chunk)
             for (p in chunk) {
                 world.tile(p)?.build?.add() // 建实体+注册, 使墙可被伤害
@@ -543,7 +593,7 @@ private fun applyChanges() {
     // - 水格上的建筑(传送带等): 自身格命中(不依赖 Groups.build 注册)
     // - 挡水墙(墙格无水, 但邻域有水): 邻域格命中(墙挡水但被水浸泡即掉血)
     // 多格建筑(2x2+)多个覆盖格有水时只伤害一次(Set 去重实体)
-    val damagedBuilds = HashSet<Building>()
+    damagedBuilds.clear()
     fun damageAt(x: Int, y: Int, f: Float) {
         if (x < 0 || y < 0 || x >= w || y >= world.height()) return
         val build = world.tile(x, y)?.build ?: return
@@ -573,7 +623,7 @@ private fun applyChanges() {
     }
 }
 
-private fun addTier(tierPos: Array<IntArray>, tierSizes: IntArray, ti: Int, x: Int, y: Int) {
+private fun addTier(ti: Int, x: Int, y: Int) {
     if (tierSizes[ti] >= tierPos[ti].size) tierPos[ti] = tierPos[ti].copyOf(tierPos[ti].size * 2)
     tierPos[ti][tierSizes[ti]++] = (x shl 16) or (y and 0xFFFF)
 }
@@ -660,15 +710,23 @@ onDisable {
     }
     floodWalls.clear()
     backupBlocks.clear()
-    upgradingKeys.clear()
     fluid = FloatArray(0)
     tierMap = ByteArray(0)
     reachable = ByteArray(0)
     floorLiquid = ByteArray(0)
     activeQueue = IntArray(0)
     visitedMark = IntArray(0)
+    upgradingKeys.clear()
     outTarget = IntArray(0)
     outDelta = FloatArray(0)
+    tierPos = emptyArray()
+    tierSizes = IntArray(0)
+    unitTiles.clear()
+    damagedBuilds.clear()
+    maskMark = IntArray(0)
+    maskGen = 0
+    sourceKeyBuf = IntArray(0)
+    sourceKeyCount = 0
     activeSize = 0
     sources.clear()
     disabling = false
@@ -682,6 +740,7 @@ onDisable {
 // creeperDebug tps N      覆盖模拟 tps(0=恢复地图标签值)
 // creeperDebug fluid x y  打印某格流体值
 command("creeperDebug", "洪水模拟调试(暂停/步进/tps覆盖/状态)") {
+    attr(coreMindustry.lib.NotForClient) // 仅终端可用: 玩家 help 不显示且不可调用
     body {
         val cmd = arg.firstOrNull()
         when (cmd) {
@@ -730,7 +789,7 @@ command("creeperDebug", "洪水模拟调试(暂停/步进/tps覆盖/状态)") {
                     reply(msg.with())
                     // 同时写文件供管道回读(终端 reply 走玩家聊天不可见)
                     runCatching {
-                        java.nio.file.Files.writeString(java.nio.file.Paths.get("_creeper_debug.txt"), msg)
+                        java.nio.file.Files.writeString(Config.rootDir.toPath().resolve("_creeper_debug.txt"), msg)
                     }
                 }
             }

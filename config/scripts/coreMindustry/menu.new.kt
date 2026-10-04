@@ -118,6 +118,11 @@ open class MenuV2(
         callback.add(body)
     }
 
+    /** 带原版图标的选项: 图标名用 [mindustry.gen.Icon] 里的名字(如 left/right/info/list), 画在文字前 */
+    @MenuBuilderDsl
+    fun option(name: String, icon: String, body: suspend () -> Unit) =
+        option(MenuProtocol.iconLabel(icon, name), body)
+
     @MenuBuilderDsl
     fun subMenu(title: String, chooseTimeout: Duration? = 60.seconds, builder: suspend MenuV2.() -> Unit) {
         option(title) {
@@ -165,7 +170,9 @@ open class MenuV2(
             menu.clear(); callback.clear()
             build()
         }
-        if (autoCloseButton) {
+        // 新菜单协议下客户端对话框自带关闭按钮(Menus.menuBuilder 里的 dialog.addCloseButton()),
+        // 再追加一个就会出现两个关闭/一个多余的"返回", 所以只在旧协议下才补。
+        if (autoCloseButton && !MenuProtocol.enabled) {
             newRow()
             option("{tr coreMenu.close}".with("receiver" to player).toString()) { close() }
         }
@@ -217,21 +224,29 @@ open class MenuV2(
 inline fun <T> MenuV2.renderPaged(
     list: List<T>,
     initialPage: Int = 1,
-    prePage: Int = 9,
+    // 手机竖屏高度有限, 每页少放几条, 否则菜单几乎顶满整屏
+    prePage: Int = if (player.con != null && player.con.mobile) 6 else 9,
     key: String = "",
     itemRender: (T) -> Unit
 ) {
     var selectedPage by stateKey(initialPage, keyPrefix = "renderPaged@$key-")
     val (page, totalPage) = calPage(selectedPage, prePage, list.size)
-    repeat(prePage) {
-        val i = (page - 1) * prePage + it
-        if (i >= list.size) return@repeat option("", this::refresh)
+    // 只渲染本页真实条目。原来用 option("") 把不足一页的空位补齐, 但旧协议(Call.menu)会把空串
+    // 原样画成一个空按钮 —— 条目少的分页菜单(如 /skill 帮助只有 1 条)会显示成一串空框, 玩家看起来
+    // 就是"菜单错位"。补空位只是为了让对话框高度稳定, 不值得用可用性换。
+    for (i in (page - 1) * prePage until minOf(page * prePage, list.size)) {
         itemRender(list[i])
     }
     column(3) {
-        // 翻页循环: 第一页点左跳到最后一页, 最后一页点右跳到第一页
-        option("<-") { selectedPage = if (page <= 1) totalPage.coerceAtLeast(1) else page - 1; refresh() }
-        option("$page/$totalPage", this::refresh)
-        option("->") { selectedPage = if (page >= totalPage) 1 else page + 1; refresh() }
+        // 翻页循环: 第一页点左跳到最后一页, 最后一页点右跳到第一页。
+        // 只显示原版 left/right 箭头图标: 标签用一个空格占位(空串会被当成占位空格, 按钮会消失);
+        // 三格按 1:2:1 分宽(箭头键窄、页码键宽), 旧协议回退时 legacyLabel 会还原成 <- / -> 文字。
+        option(MenuProtocol.weighted(1, MenuProtocol.iconLabel("left", " "))) {
+            selectedPage = if (page <= 1) totalPage.coerceAtLeast(1) else page - 1; refresh()
+        }
+        option(MenuProtocol.weighted(2, "$page/$totalPage"), this::refresh)
+        option(MenuProtocol.weighted(1, MenuProtocol.iconLabel("right", " "))) {
+            selectedPage = if (page >= totalPage) 1 else page + 1; refresh()
+        }
     }
 }

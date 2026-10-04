@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import mindustry.gen.FollowUpMenuCallPacket
 import mindustry.gen.HideFollowUpMenuCallPacket
+import mindustry.gen.HideMenuBuilderCallPacket
+import mindustry.gen.MenuBuilderCallPacket
 import mindustry.gen.MenuCallPacket
 import mindustryX.events.SendPacketEvent
 import java.time.Duration
@@ -57,12 +59,22 @@ val adaptiveWindow by config.key(
 val lastMenuAt = ConcurrentHashMap<String, Pair<Long, Int>>()
 
 // 菜单发送/隐藏时记录时间(逐连接级), 自适应开启的玩家在窗口期内跳过计分板刷新, 2秒后自然淡出让位
-// 服务端主动隐藏菜单(hideFollowUpMenu)没有客户端回包可依赖, 监听到且 menuId 匹配时立即恢复计分板, 不等满隐藏窗口
+// 服务端主动隐藏菜单没有客户端回包可依赖, 监听到且 menuId 匹配时立即恢复计分板, 不等满隐藏窗口
+// 协议: 160 起菜单走 MenuBuilder(MenuBuilderCallPacket/HideMenuBuilderCallPacket);
+//       MenuCallPacket/FollowUpMenuCallPacket/HideFollowUpMenuCallPacket 只在旧协议应急回退
+//       (menu.useMenuBuilderProtocol=false)时才出现。两套都要认, 否则自适应收不到任何菜单事件。
 listen<SendPacketEvent> {
     val con = it.con ?: return@listen
     val uuid = con.player?.uuid() ?: return@listen
     val packet = it.packet
     when (packet) {
+        // 160 新协议: MenuBuilderCallPacket 的菜单ID字段是 id(不是 menuId)
+        is MenuBuilderCallPacket -> lastMenuAt[uuid] = System.currentTimeMillis() to packet.id
+        is HideMenuBuilderCallPacket -> {
+            val cur = lastMenuAt[uuid] ?: return@listen
+            if (cur.second == packet.menuId) lastMenuAt.remove(uuid)
+        }
+        // 旧协议(<=159): 应急回退开关关闭新协议时使用
         is MenuCallPacket -> lastMenuAt[uuid] = System.currentTimeMillis() to packet.menuId
         is FollowUpMenuCallPacket -> lastMenuAt[uuid] = System.currentTimeMillis() to packet.menuId
         is HideFollowUpMenuCallPacket -> {
@@ -72,15 +84,22 @@ listen<SendPacketEvent> {
     }
 }
 
-// 玩家选择菜单项后视为菜单可能已关闭: 3秒内没有新菜单包则恢复计分板(不等满隐藏窗口)
+// 菜单关闭/点选后的恢复策略。
 // MenuChooseEvent 是 SA 事件(menu.kts 用 launchEmit 发射), 必须用 listenTo 走 SA 事件链;
-// 用 listen 会注册到 arc 事件链永远收不到, 计分板只能等 adaptiveWindow 兜底恢复
+// 用 listen 会经 coreMindustry.lib.ListenExt 注册进 arc 的 Events.events 表, 而 SA 的 launchEmit
+// 不经过 arc.Events.fire -> 永远收不到(实测确认)。
 listenTo<MenuChooseEvent> {
     val uuid = this.player.uuid()
-    launch(Dispatchers.Default) {
-        delay(3000)
-        val last = lastMenuAt[uuid]?.first ?: return@launch
-        if (System.currentTimeMillis() - last >= 3000) lastMenuAt.remove(uuid)
+    if (this.value < 0) {
+        // 取消/关闭(menu.kts 对取消回包给 -1): 之后不会再有菜单, 立即恢复计分板
+        lastMenuAt.remove(uuid)
+    } else {
+        // 点选: 可能触发 followup/翻页而重发菜单, 3 秒内没有新菜单包才恢复, 避免计分板闪一下
+        launch(Dispatchers.Default) {
+            delay(3000)
+            val last = lastMenuAt[uuid]?.first ?: return@launch
+            if (System.currentTimeMillis() - last >= 3000) lastMenuAt.remove(uuid)
+        }
     }
 }
 

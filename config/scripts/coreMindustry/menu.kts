@@ -39,12 +39,15 @@ onEnable {
 
         var commands = cmds.subCommands().values.toSet().sortedBy { it.name }
         if (!showAll) commands = commands.filter { info ->
+            // Hidden.visible() 内部就是 hasPermission 判定, 用 requirePermission 声明的命令在这里会被正确过滤;
+            // 注意 CommandInfo.permission 是旧字段(requirePermission 不回填), 不要用它做判定。
             info.attrs.all { it !is Hidden || it.visible() }
         }
         MenuV2(player) {
             title = if (prefix.isEmpty()) "{tr command.help.title}".with("receiver" to player).toString()
             else "{tr command.help.titlePrefix}".with("receiver" to player, "prefix" to prefix).toString()
-            msg = "{tr coreMenu.help.msg}".with("receiver" to player).toString()
+            // count 必须传: coreMenu.help.msg 里是 {count}, 不传会渲染成 {ERR: not found count}
+            msg = "{tr coreMenu.help.msg}".with("receiver" to player, "count" to commands.size).toString()
             renderPaged(commands, page) {
                 option(buildString {
                     append("[lightgray]${prefix}[gold]${it.name}")

@@ -2,6 +2,7 @@ package mapScript
 
 import mindustry.game.EventType.Trigger
 import mindustry.gen.Iconc
+import kotlinx.coroutines.withContext
 
 name = "填海造陆"
 modeIntroduce(
@@ -45,9 +46,11 @@ listen<EventType.BlockBuildEndEvent> {
             var any = false
             tile.getLinkedTiles { if (myTiles[it.array()].discover()) any = true }
             if (any) {
-                launch(Dispatchers.game) {
+                launch(Dispatchers.Default) {
                     delay(100)
-                    Call.deconstructFinish(tile, block, null)
+                    withContext(Dispatchers.game) {
+                        Call.deconstructFinish(tile, block, null)
+                    }
                 }
                 tile.circle(blocksToOpen[block]!!) { x, y ->
                     discoverQueue.add(myTiles[world.packArray(x, y)])
@@ -57,9 +60,11 @@ listen<EventType.BlockBuildEndEvent> {
 
         Blocks.shockMine ->
             if (myTiles[tile.array()].unDiscover())
-                launch(Dispatchers.game) {
+                launch(Dispatchers.Default) {
                     delay(100)
-                    Call.deconstructFinish(tile, block, null)
+                    withContext(Dispatchers.game) {
+                        Call.deconstructFinish(tile, block, null)
+                    }
                 }
     }
 }

@@ -28,7 +28,22 @@ fun enableWatch() {
                         val id = DirScriptRegistry.getIdByFile(file.toFile(), Config.rootDir)
                         val script = ScriptRegistry.getScriptInfo(id) ?: return@forEach
                         logger.info("脚本文件更新: ${event.kind().name()} ${script.id}")
-                        delay(1000)
+                        // 真防抖: 等文件稳定(连续两次 mtime+size 不变)再编译。
+                        // 原来固定 delay(1000) 会在"多步编辑/连续保存"的中间状态编译,
+                        // 症状是报同一文件内符号的 Unresolved reference
+                        var lastStamp = -1L
+                        var stableTimes = 0
+                        var waitedMs = 0
+                        while (stableTimes < 2 && waitedMs < 5000) {
+                            delay(250)
+                            waitedMs += 250
+                            val f = file.toFile()
+                            val stamp = f.lastModified() * 31 + f.length()
+                            if (stamp == lastStamp) stableTimes++ else {
+                                stableTimes = 0
+                                lastStamp = stamp
+                            }
+                        }
                         ScriptManager.transactionV2 {
                             reload(script)
                         }.printResult()

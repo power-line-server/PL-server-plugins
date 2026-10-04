@@ -103,13 +103,22 @@ fun scanWebuiKeys(): Set<String> {
     val keys = mutableSetOf<String>()
     val webuiDir = Config.dataDir.resolve("webui")
     if (!webuiDir.exists()) return keys
-    // 匹配 data-i18n="key", data-i18n-placeholder="key", WebUI.t('key'), t('key'), i18n: 'key'
+    // 覆盖前端全部实际写法: data-i18n / -placeholder / -title / -alt / -aria-label 属性,
+    // WebUI.t('key') 与 t('key')(单双引号均可), i18n: 'key', showConfirm('key', ...),
+    // 以及 ERROR_TRANSLATIONS 里 '后端消息': 'webui.xxx' 这类映射表值
+    // 注意: 漏掉任何一种引用写法, 对应 key 都会在下次同步被当作"未引用"整行删除,
+    //       新增前端引用形式时必须同步在这里补正则(或加入上方 manualKeys 白名单)
     val webuiRegexes = listOf(
         Regex("""data-i18n-placeholder="([\w.\-]+)"""),
+        Regex("""data-i18n-title="([\w.\-]+)"""),
+        Regex("""data-i18n-alt="([\w.\-]+)"""),
+        Regex("""data-i18n-aria-label="([\w.\-]+)"""),
         Regex("""data-i18n="([\w.\-]+)"""),
-        Regex("""WebUI\.t\('([\w.\-]+)'"""),
-        Regex("""\bt\('([\w.\-]+)'"""),
-        Regex("""i18n:\s*'([\w.\-]+)'""")
+        Regex("""WebUI\.t\(['"]([\w.\-]+)['"]"""),
+        Regex("""\bt\(['"]([\w.\-]+)['"]"""),
+        Regex("""i18n:\s*['"]([\w.\-]+)['"]"""),
+        Regex("""showConfirm\('([\w.\-]+)'"""),
+        Regex("""'[^']*':\s*'(webui\.[\w.\-]+)'""")
     )
     webuiDir.walkTopDown().forEach { file ->
         if (!file.isFile) return@forEach

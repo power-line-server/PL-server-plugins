@@ -188,7 +188,7 @@
 
     <div id="loginAlert" class="alert alert-danger d-none" role="alert"></div>
 
-    <form id="loginForm" autocomplete="off">
+    <form id="loginForm" autocomplete="on">
       <div class="mb-3">
         <label for="usernameInput" class="form-label" data-i18n="webui.login.usernameLabel">用户名</label>
         <input type="text" class="form-control form-control-lg" id="usernameInput"
@@ -197,9 +197,26 @@
       </div>
       <div class="mb-3">
         <label for="passwordInput" class="form-label" data-i18n="webui.login.passwordLabel">密码</label>
-        <input type="password" class="form-control form-control-lg" id="passwordInput"
-               placeholder="请输入密码" required autocomplete="current-password"
-               data-i18n-placeholder="webui.login.passwordPlaceholder">
+        <div class="input-group">
+          <input type="password" class="form-control form-control-lg" id="passwordInput"
+                 placeholder="请输入密码" required autocomplete="current-password"
+                 data-i18n-placeholder="webui.login.passwordPlaceholder">
+          <button type="button" class="btn btn-outline-secondary" id="togglePwdBtn"
+                  title="显示密码" aria-label="显示密码" aria-pressed="false"
+                  data-i18n-title="webui.login.showPassword"
+                  data-i18n-aria-label="webui.login.showPassword">
+            <svg id="pwdEyeIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            <svg id="pwdEyeOffIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                 aria-hidden="true" style="display:none">
+              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+              <line x1="1" y1="1" x2="23" y2="23"/>
+            </svg>
+          </button>
+        </div>
       </div>
       <div class="d-grid gap-2">
         <button type="submit" class="btn btn-primary btn-lg" id="loginBtn"
@@ -226,8 +243,31 @@
       }
       function hideError() { alertBox.classList.add('d-none'); }
 
+      /* 显示/隐藏密码: 自绘按钮, 不依赖各浏览器内置的密码揭示控件(Firefox/Edge 表现不一致) */
+      var pwdInput = document.getElementById('passwordInput');
+      var pwdToggleBtn = document.getElementById('togglePwdBtn');
+      var pwdEyeIcon = document.getElementById('pwdEyeIcon');
+      var pwdEyeOffIcon = document.getElementById('pwdEyeOffIcon');
+      function setPwdVisible(visible) {
+        pwdInput.type = visible ? 'text' : 'password';
+        var label = visible
+          ? WebUI.t('webui.login.hidePassword', '隐藏密码')
+          : WebUI.t('webui.login.showPassword', '显示密码');
+        pwdToggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+        pwdToggleBtn.setAttribute('aria-label', label);
+        pwdToggleBtn.setAttribute('title', label);
+        pwdEyeIcon.style.display = visible ? 'none' : '';
+        pwdEyeOffIcon.style.display = visible ? '' : 'none';
+      }
+      pwdToggleBtn.addEventListener('click', function () {
+        setPwdVisible(pwdInput.type === 'password');
+        pwdInput.focus();
+      });
+      setPwdVisible(false);
+
       function showForm() {
-        WebUI.loadI18n(WebUI.getLang());
+        // 语言包加载失败时保留页面内联中文兜底, 不影响登录表单可用性
+        WebUI.loadI18n(WebUI.getLang()).catch(function () {});
         document.body.style.visibility = '';
       }
 

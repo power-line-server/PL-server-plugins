@@ -773,7 +773,7 @@
           saveLimits().then(function () {
             WebUI.toast(WebUI.t('webui.settings.limits.saved', '限制配置已保存并生效'), 'success');
           }).catch(function (e) {
-            WebUI.toast(e.message || '保存失败', 'error');
+            WebUI.toast(e.message || WebUI.t('webui.common.saveFailed', '保存失败'), 'error');
           }).then(function () {
             btn.disabled = false;
           });
@@ -822,7 +822,7 @@
             bootstrap.Modal.getInstance(document.getElementById('keyEditModal')).hide();
             loadKeys();
           }).catch(function (e) {
-            WebUI.toast(e.message || '保存失败', 'error');
+            WebUI.toast(e.message || WebUI.t('webui.common.saveFailed', '保存失败'), 'error');
           }).then(function () { btn.disabled = false; });
         });
 
@@ -867,7 +867,7 @@
             WebUI.toast(WebUI.t('webui.settings.background.clearSuccess', '已恢复默认背景'), 'success');
             loadBackgrounds();
           }).catch(function (e) {
-            WebUI.toast(e.message || '操作失败', 'error');
+            WebUI.toast(e.message || WebUI.t('webui.common.opFailed', '操作失败'), 'error');
           });
         });
       });

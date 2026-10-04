@@ -8,6 +8,7 @@ import cf.wayzer.scriptAgent.thisContextScript
 import coreLibrary.lib.*
 import coreMindustry.MenuBuilder
 import coreMindustry.lib.*
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.onTimeout
@@ -106,10 +107,12 @@ class VoteEvent(
             vote(starter, Action.Agree)
             //弹窗投票
             if (menuDelay >= 0) allCanVote().forEach {
-                launch(Dispatchers.game) {
+                launch(Dispatchers.Default) {
                     delay(menuDelay * 1000L)
-                    if (it in voted) return@launch
-                    openMenu(it)
+                    withContext(Dispatchers.game) {
+                        // 原为 if (it in voted) return@launch —— return 不能跨 withContext 的 lambda, 改为条件调用
+                        if (it !in voted) openMenu(it)
+                    }
                 }
             }
             //投票超时处理
@@ -177,9 +180,11 @@ class VoteEvent(
             newRow()
             option("{tr voteLib.option.pending}".with("receiver" to p).toString()) {
                 p.sendMessage("{tr voteLib.reply.remindLater}".with())
-                script.launch(Dispatchers.game) {
+                script.launch(Dispatchers.Default) {
                     delay(20_000)
-                    if (activeRef().get() == this@VoteEvent && p !in voted) openMenu(p)
+                    withContext(Dispatchers.game) {
+                        if (activeRef().get() == this@VoteEvent && p !in voted) openMenu(p)
+                    }
                 }
             }
         }.sendTo(p, 60_000)

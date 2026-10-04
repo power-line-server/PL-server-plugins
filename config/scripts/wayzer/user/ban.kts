@@ -144,10 +144,13 @@ suspend fun ban(player: PlayerData, time: Int, reason: String, operate: Player?,
             ip
         )
     }
-    Groups.player.filter { PlayerData[it].id in player.ids }.forEach {
-        it.kick(ban)
-        val opDisplay = operatorName ?: "Server"
-        broadcast("{tr ban.broadcast.ban}".with("operator" to opDisplay, "target" to it, "reason" to reason))
+    // 实体组遍历/踢人/广播/玩家数据访问必须在游戏线程执行(调用方可能是 WebUI/反病毒等 IO 线程)
+    withContext(Dispatchers.game) {
+        Groups.player.filter { PlayerData[it].id in player.ids }.forEach {
+            it.kick(ban)
+            val opDisplay = operatorName ?: "Server"
+            broadcast("{tr ban.broadcast.ban}".with("operator" to opDisplay, "target" to it, "reason" to reason))
+        }
     }
 }
 

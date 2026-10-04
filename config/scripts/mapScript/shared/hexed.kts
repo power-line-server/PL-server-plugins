@@ -5,6 +5,7 @@ package mapScript.shared
 import mindustry.world.blocks.storage.CoreBlock.CoreBuild
 import mindustry.world.modules.ItemModule
 import kotlin.time.Duration.Companion.minutes
+import kotlinx.coroutines.withContext
 
 listen<EventType.BlockDestroyEvent> {
     val core = it.tile.build as? CoreBuild ?: return@listen
@@ -28,10 +29,12 @@ listenTo<wayzer.map.AssignTeamEvent> {
 }
 
 onEnable {
-    launch(Dispatchers.game) {
+    launch(Dispatchers.Default) {
         delay(1.minutes)
-        state.rules.canGameOver = true
-        Call.setRules(state.rules)
+        withContext(Dispatchers.game) {
+            state.rules.canGameOver = true
+            Call.setRules(state.rules)
+        }
     }
 }
 

@@ -13,6 +13,7 @@ import coreLibrary.lib.with
 import coreMindustry.lib.broadcast
 import coreMindustry.lib.game
 import coreMindustry.lib.nextTick
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,9 +88,11 @@ object MapManager {
                     "reason" to (e.message ?: "")
                 )
             )
-            thisContextScript().launch(Dispatchers.game) {
+            thisContextScript().launch(Dispatchers.Default) {
                 delay(1000)
-                loadMapSync()
+                withContext(Dispatchers.game) {
+                    loadMapSync()
+                }
             }
             return false
         }
