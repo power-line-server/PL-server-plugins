@@ -2,14 +2,17 @@
 
 本文件用于规范代理在 Mindustry 服务器插件开发中的核心原则、懒惰开发者法则与具体工作流，所有修改应以简体中文为首要表达。
 
+> **当前基线**：**Mindustry 160.5 + MindustryX 2026.10.02.B502**（server.jar）、**JDK 27**、ScriptAgent4MindustryExt 3.4.0。
+> **本开源包不含**（只存在于作者的开发仓库与主服）：WebUI 网页管理后台、技能系统、单位工厂、音乐系统、后缀与头衔、玩家信息数据层（playerInfo）、集合传送（gatherTp）、每日一言（dailyQuote）、服务器简介（introduce）、防炸核心（antiCoreGrief）、反逻辑病毒（antiLogicVirus）、匿名 PVP（pvpAnonymous）。涉及这些功能的历史说明仅作参考。
+
 ## 核心原则
 
 1. 所有修改以简体中文为首要目标
-2. 对插件的任何修改都要同步更新同级 files.md
+2. 对插件的任何修改都要同步更新相关文档（本开源仓库为 README.md；开发仓库另有 files.md）
 3. 新需求必须完美适配现有架构，不盲目新增/删除/修改文件、指令；不要因一次修改导致其他文件受影响而引发更多 bug，除非此修改是必须的或用户主动要求。权限须与 config.conf 现有权限组适配，能在此文件中配置对应权限组，不另起炉灶自写权限，避免原有框架失去意义。
 4. 所有插件的权限组配置必须放在 config.conf 的 coreLibrary.commands.permissionCmd.groups 下，而不是在插件脚本内通过 PermissionApi.registerDefault() 硬编码。新增脚本若需要权限注册，必须更新 config.conf 而非在脚本内调用 registerDefault。
 5. 未经用户允许，严禁修改 AGENTS.md 本身
-6. 所有修改提交到 https://github.com/power-line-server/PL-server-plugins-dev
+6. 所有修改提交到 https://github.com/power-line-server/PL-server-plugins（开发仓库为 PL-server-plugins-dev）
 7. 积极使用联网搜索功能与技能
 8. 一切修改以在 Linux 系统上正常运行为主要目标，以在 Windows 系统上正常运行为次要目标（Linux 原生支持 ANSI/UTF-8，Windows 由 JANSI 等库处理兼容性）
 9. 服务器首要服务原版客户端，改端为次要目标：不得要求玩家下载修改版客户端或装载模组，所有功能必须保证未装模组的原版客户端与改端客户端均能正常游玩。设计功能时优先使用服务端脚本 + 原版协议能力（如 player.name 实体同步、ChatFilter、菜单数据包），不依赖改端专属特性或客户端补丁；确需改端能力时，须在实施计划中先行声明并说明原版替代方案
@@ -64,20 +67,20 @@
 
 将上述原则落地到 Mindustry 服务器插件开发的具体工作流：
 
-- 对插件的任何修改都要同步更新同级 files.md；files.md 需详细描述 d:\server\server 下全部文件和文件夹作用；cache/ 等意义不大的目录可简化描述。发现 files.md 与实际不一致或希望更详细的描述时，也可进行修改。
+- 对插件的任何修改都要同步更新相关文档（本开源仓库为 `README.md`；开发仓库另有 `files.md` 描述全部文件与目录）。文档必须与本仓库实际内容一致，发现不一致时一并修正。
 - 新需求必须完美适配现有架构，不盲目新增/删除/修改文件、指令；不要因一次修改导致其他文件受影响而引发更多 bug，除非此修改是必须的或用户主动要求。权限须与 config.conf 现有权限组适配，能在此文件中配置对应权限组，不另起炉灶自写权限，避免原有框架失去意义。
-- 所有修改提交到 https://github.com/power-line-server/PL-server-plugins-dev
+- 所有修改提交到 https://github.com/power-line-server/PL-server-plugins（开发仓库为 power-line-server/PL-server-plugins-dev）
 - 积极使用联网搜索功能与技能
 
 ## 本地验证与测试清理规范
 
 ### 服务器本地启动验证
 
-- **启动命令**：`cd d:\server\server && java --enable-native-access=ALL-UNNAMED -jar server.jar`。建议 `stdbuf -oL -eL` 前缀保证日志实时输出（重定向到文件时 stdout 是块缓冲，日志会延迟刷新）；后台运行用 `nohup ... & disown`
+- **启动命令**：`cd <仓库目录> && bash run.sh`（等价直接启动：`java --enable-native-access=ALL-UNNAMED -jar server.jar`）。当前基线 **JDK 27**（`java -version` 实测 27+35）、**Mindustry 160.5 + MindustryX 2026.10.02.B502**。建议 `stdbuf -oL -eL` 前缀保证日志实时输出（重定向到文件时 stdout 是块缓冲，日志会延迟刷新）；后台运行用 `nohup ... & disown`
 - **启动耗时**：有编译缓存约 1-2 分钟；删除 `cache/compiled/` 全量重编译约 3-6 分钟
 - **成功标志**：日志出现 `Server loaded. Type 'help' for help.` + `Opened a server on port 6567`
 - **偶发启动失败**：`[Instantiate Failed] ScriptClassLoader NPE` / `[Load Failed] xxx ConditionFail` 多为偶发（进程清理竞争、临时目录状态），重启一次即可；持续复现才排查代码
-- **停止**：Windows 下 `taskkill //F //IM java.exe`（可残留多个 java 进程，全部杀掉）
+- **停止**：Linux 下 `pkill -f 'jar server.jar'`（watchdog 拉起的实例用 `bash watchdog.sh stop`）；Windows 下 `taskkill //F //IM java.exe`（可残留多个 java 进程，全部杀掉）
 
 ### 测试痕迹清理（每次测试后必须）
 
@@ -89,16 +92,16 @@
 
 ### 终端与游戏内命令前缀
 
-- ScriptAgent 注册的服务端命令在**服务器终端（控制台）中不加任何前缀**直接输入（如 `perf mem`、`renderMap 8`）；带 `/` 的形式是**玩家聊天命令**（如 `/music`）。终端输带斜杠的形式会提示"未知指令"，属正常现象，不是命令失效
+- ScriptAgent 注册的服务端命令在**服务器终端（控制台）中不加任何前缀**直接输入（如 `perf mem`、`renderMap 8`）；带 `/` 的形式是**玩家聊天命令**（如 `/vote`）。终端输带斜杠的形式会提示"未知指令"，属正常现象，不是命令失效
 - 仅终端可用的命令用 `attr(NotForClient)`（import coreMindustry.lib.NotForClient）：玩家 help 不显示、游戏内输入提示未知指令；**终端 help 正常显示且可直接调用**
-- 反之仅玩家可用的命令用 `attr(ClientOnly)`（如 /music）
+- 反之仅玩家可用的命令用 `attr(ClientOnly)`（如 /board）
 
 ### mapTag 脚本触发验证（无客户端时）
 
-- 用 python 修改存档 meta 的 `description` 注入 `[@标签]`（如 `[@pvpAnonymous]`），经 WebUI 回档触发脚本 Enable/Disable，从日志验证生命周期
+- 用 python 修改存档 meta 的 `description` 注入 `[@标签]`（如 `[@autoExchange]`），再通过换图/回档触发脚本 Enable/Disable，从日志验证生命周期
 - 存档格式：`MSAV`(4B) + version(4B) + 各 chunk（meta/patches/content/map/entities/markers/custom，每 chunk 为 `>i` 长度 + 数据），整体 zlib 压缩
-- **WebUI**：登录 `POST /api/login`（管理 token 在 config.conf 的 `webui { token }`，默认 `"AAA"`），回档 `PUT /api/saves/<槽位>`
-- **WebUI 的 `/api/command` 走 `Commands.Root` 域**：自定义脚本命令（如 `anon`）不在其中，无法用它验证自定义命令；它只能执行 Root 域命令（原版控制台命令等）。终端命令验证需走真实终端或玩家命令链
+- **回档/换图**：本开源包不含 WebUI；可用终端命令（如 `host <地图ID>`）或玩家命令换图，从而触发地图脚本的 Enable/Disable
+- **命令域提醒**：控制台/HTTP 接口走的 `Commands.Root` 域只含原版控制台命令，自定义脚本命令（如 `anon`）不在其中；验证自定义命令需走真实终端或玩家命令链
 
 ## 配置文件规范
 
@@ -115,14 +118,14 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 ### config.key 注册规则
 
-1. **脚本中用 `var X by config.key(默认值, 描述)`**：config 路径前缀为脚本 ID（`/` 替换为 `.`），如 `wayzer/ext/music.kts` 的前缀为 `wayzer.ext.music`
+1. **脚本中用 `var X by config.key(默认值, 描述)`**：config 路径前缀为脚本 ID（`/` 替换为 `.`），如 `wayzer/ext/tips.kts` 的前缀为 `wayzer.ext.tips`
 2. **值等于默认值时不写入 config.conf**：这是 ConfigApi 的正常行为，不是 bug。用户需修改时在 `config.conf` 中添加对应配置节
 3. **带 `onChange` 回调的 key**：使用 `config.key("name", default, desc) { onChange }` 重载，首参为显式 key 名
 
 ### config.base.conf 维护规则
 
 1. **新增 `config.key` 时必须同步更新 `config.base.conf`**：在对应模块的配置节中添加默认值和 `#` 注释说明
-2. **配置节结构按脚本路径组织**：如 `wayzer.ext.music` 对应 `wayzer { ext { music { ... } } }`
+2. **配置节结构按脚本路径组织**：如 `wayzer.ext.tips` 对应 `wayzer { ext { tips { ... } } }`
 3. **每个配置项必须有 `#` 注释**：注释内容取自 `config.key` 的描述参数
 4. **复杂默认值可省略**：如 `scoreboard.template` 的默认值是多行字符串，注释中标注"请参考脚本源码"
 5. **Duration 类型用字符串**：如 `"10s"`、`"5m"`，不用毫秒数字
@@ -131,7 +134,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 ### config.conf 维护规则
 
 1. **代理不直接编辑 config.conf**：通过 `/config set` 命令或脚本内 `config.key` 修改值，由 ConfigApi 的 `saveFile()` 增量写入（保留注释）
-2. **例外**：权限组（`coreLibrary.commands.permissionCmd.groups`）和需要预设的配置节（如 `wayzer.ext.music`）可直接编辑 config.conf
+2. **例外**：权限组（`coreLibrary.commands.permissionCmd.groups`）和需要预设的配置节（如 `wayzer.ext.tips`）可直接编辑 config.conf
 3. **`/config write` 会全量覆盖**：该命令调用 `saveFile()` 的全量 render 路径（当文件无注释时触发），会丢失注释。避免使用，或使用后从 `config.base.conf` 恢复注释
 4. **config.conf 中的值优先于 config.base.conf**：用户自定义的值不会被 base 覆盖
 
@@ -164,7 +167,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 ### 翻译文件规则
 
-1. **只维护简体中文**：新增/修改 key 时，仅在 `d:\server\server\config\scripts\data\lang\bundle_zh_CN.properties` 添加或更新对应翻译。`bundle.properties`和其他语言文件由用户和社区手动翻译，**代理不同时修改多个语言文件**。
+1. **只维护简体中文**：新增/修改 key 时，仅在 `config/scripts/data/lang/bundle_zh_CN.properties` 添加或更新对应翻译。`bundle.properties`和其他语言文件由用户和社区手动翻译，**代理不同时修改多个语言文件**。
 
 2. **langSync 自动补 key**：脚本中的 `{tr key}` 会在服务器启动或 `sa lang reload` 时被 `langSync.kts` 自动扫描并添加缺失的 key 到所有 bundle 文件（值为空）。代理只需填充 `bundle_zh_CN.properties` 的值。
 
@@ -180,26 +183,25 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 新增 key 到 `bundle_zh_CN.properties`（及其他语言文件）时，**必须按功能模块分组插入到对应区域**，严禁直接追加到文件末尾造成游离键。langSync 虽然会自动补 key，但它把新 key 追加到文件末尾，不区分模块，因此代理手动填充翻译值时必须把 langSync 产生的末尾游离键移到正确位置。
 
-1. **按功能模块分组**：每个脚本/插件对应一个独立的 key 区块，用注释行分隔。例如 `playerInfo` 的 key 必须放在 `# ===== playerInfo =====` 注释下方，`webui` 的 key 必须放在 `# ===== webui =====` 注释下方。
+1. **按功能模块分组**：每个脚本/插件对应一个独立的 key 区块，用注释行分隔。例如 `saveMgr` 的 key 必须放在 `# ===== saveMgr =====` 注释下方，`tips` 的 key 必须放在 `# ===== tips =====` 注释下方。
 
 2. **插入位置规则**：
    - 新增 key 属于已有模块时，插入到该模块区块的末尾（下一条 `# =====` 注释之前）
    - 新增 key 属于全新模块时，在文件末尾新建 `# ===== 模块名 =====` 注释，再添加 key
    - 同一模块内的 key 按逻辑顺序排列（如 `tab` -> `menu` -> `reply` -> `broadcast` -> `detail` -> `action` -> `search`）
 
-3. **子模块嵌套**：功能较复杂的模块（如 `webui.players`）可用二级注释分隔子模块，例如：
+3. **子模块嵌套**：功能较复杂的模块（如 `saveMgr.menu`）可用二级注释分隔子模块，例如：
    ```properties
-   # ===== webui =====
-   webui.title=...
-   webui.nav.dashboard=...
+   # ===== saveMgr =====
+   saveMgr.menu.main.title=...
+   saveMgr.menu.main.msg=...
    
-   # ----- webui.players -----
-   webui.players.title=...
-   webui.players.tab.online=...
-   webui.players.tab.search=...
+   # ----- saveMgr.menu.slot -----
+   saveMgr.menu.slot.title=...
+   saveMgr.menu.slot.load=...
    
-   # ----- webui.console -----
-   webui.console.title=...
+   # ----- saveMgr.reply -----
+   saveMgr.reply.saved=...
    ```
 
 4. **清理 langSync 游离键**：langSync 自动追加的 key 会出现在文件末尾（值为空）。代理填充翻译值时，必须将该 key 从末尾剪切到对应模块区块内，而不是原地填值。操作步骤：
@@ -219,7 +221,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 #### 触发翻译值丢失的典型场景
 
-1. **重构/修改插件时临时移除 `{tr ...}` 引用**：如把 `"{tr music.menu.title}"` 临时改成硬编码字符串测试，重启后 langSync 判定该 key "未被引用" → 从 properties 删除 → 改回 `{tr ...}` 后重启 → key 被重新添加为**空值**。这是最隐蔽的丢失路径
+1. **重构/修改插件时临时移除 `{tr ...}` 引用**：如把 `"{tr saveMgr.menu.main.title}"` 临时改成硬编码字符串测试，重启后 langSync 判定该 key "未被引用" → 从 properties 删除 → 改回 `{tr ...}` 后重启 → key 被重新添加为**空值**。这是最隐蔽的丢失路径
 2. **重命名/移动 key**：旧 key 不再被引用 → 整行删除（含翻译值）；新 key 被引用 → 以空值添加。结果是新 key 没有翻译值
 3. **动态 key 未加白名单**：`{tr ${sourceDisplayName(track.source)}}` 这类动态拼接无法被正则捕获，重启后对应 key 被删除
 4. **脚本被禁用/卸载**：被禁用脚本的 `{tr ...}` 引用仍在源码中（langSync 扫描源码而非编译产物），所以禁用本身不会丢 key；但若删除了脚本文件，则该脚本独有的 key 会被删除
@@ -227,8 +229,8 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 #### 代理工作要求
 
 - **关键认知**：langSync **不会主动清空已有 key 的值**。翻译值丢失只发生在「key 被删除 → 后续重新引用 → 以空值重新添加」这条路径上。单纯修改脚本逻辑（保留 `{tr ...}` 引用不变）不会影响 properties 中的值
-- **移除/重命名/注释掉 `{tr ...}` 引用时**：重启服务器后，被移除引用的 key 会从 properties 整行删除（含翻译值）。若之后恢复引用，会以空值重新添加。此时必须用 `Grep` pattern `^[\w.]+=$` 检查 `d:\server\server\config\scripts\data\lang\bundle_zh_CN.properties` 中的空值行并重新填充
-- **新增动态拼接 key**（`{tr ${...}}` 形式）：正则 `\{tr\s+([\w.\-]+)` 无法捕获 `$` 开头的动态变量，必须同步在 `d:\server\server\config\scripts\coreLibrary\langSync.kts` 的 `manualKeys` 集合（约第 20 行起）中添加对应 key，否则下次同步会被当作"未引用"删除
+- **移除/重命名/注释掉 `{tr ...}` 引用时**：重启服务器后，被移除引用的 key 会从 properties 整行删除（含翻译值）。若之后恢复引用，会以空值重新添加。此时必须用 `Grep` pattern `^[\w.]+=$` 检查 `config/scripts/data/lang/bundle_zh_CN.properties` 中的空值行并重新填充
+- **新增动态拼接 key**（`{tr ${...}}` 形式）：正则 `\{tr\s+([\w.\-]+)` 无法捕获 `$` 开头的动态变量，必须同步在 `config/scripts/coreLibrary/langSync.kts` 的 `manualKeys` 集合（约第 20 行起）中添加对应 key，否则下次同步会被当作"未引用"删除
 - **重命名 key 的安全顺序**：先在新位置添加 `{tr newKey}` 引用并填充翻译值，确认无误后再删除旧 `{tr oldKey}` 引用。避免中间状态（旧 key 已删引用、新 key 尚未引用）被同步清空
 - **备份意识**：对 properties 文件进行大量修改前，建议先备份一份，避免同步意外导致翻译值丢失
 
@@ -243,7 +245,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 - [ ] 未修改 `bundle.properties`（英文）和其他语言文件（除非用户明确要求）
 - [ ] 控制台输出走 `ContentHelper.logToConsole` / `broadcast` 标准链路，未直接 `Log.info` 带 ANSI 码
 - [ ] `PlaceHoldString` 中用 Mindustry 颜色码（如 `[green]`），未直接写 ANSI 码
-- [ ] 修改终端/日志相关代码后，Grep 检查 `log-0.txt` 无颜色码残留（`\u001b\[`、`&[a-zA-Z]{1,2}`、`\[[a-z_]*]`）；日志文件为纯文本，与原版 Mindustry 一致；WebUI 实时日志通过 `unifiedTextHolder` 获取带颜色码文本
+- [ ] 修改终端/日志相关代码后，Grep 检查 `log-0.txt` 无颜色码残留（`\u001b\[`、`&[a-zA-Z]{1,2}`、`\[[a-z_]*]`）；日志文件为纯文本，与原版 Mindustry 一致；实时日志流通过 `unifiedTextHolder` 获取带颜色码文本
 - [ ] 修改在 Linux 上正常运行（主要目标），Windows 由 JANSI 库处理兼容性（次要目标）
 - [ ] 移除/重命名/注释掉 `{tr ...}` 引用后，Grep 检查 `bundle_zh_CN.properties` 无新增空值行（`key=`）并重新填充
 - [ ] 新增 `{tr ${...}}` 动态拼接时，已把对应 key 加入 `langSync.kts` 的 `manualKeys` 白名单
@@ -283,7 +285,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 ## 菜单规范
 
-服务器菜单系统（[menu.lib.kt](file:///d:/server/server/config/scripts/coreMindustry/menu.lib.kt) 和 [menu.new.kt](file:///d:/server/server/config/scripts/coreMindustry/menu.new.kt)）已内置关闭按钮自动追加机制。代理编写菜单时**必须遵循以下规范**，避免漏加或重复添加关闭按钮。
+服务器菜单系统（[menu.lib.kt](config/scripts/coreMindustry/menu.lib.kt) 和 [menu.new.kt](config/scripts/coreMindustry/menu.new.kt)）已内置关闭按钮自动追加机制。代理编写菜单时**必须遵循以下规范**，避免漏加或重复添加关闭按钮。
 
 ### 关闭按钮自动追加机制
 
@@ -359,7 +361,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 - **绝对禁止在广播级（`con == null`）取消数据包**：如果 `isCancelled = true`，`provider.sendAllServer` 不会执行，框架不会遍历连接，第 2 级逐连接级事件也不会触发，**所有客户端（含 MindustryX 客户端）都收不到该包**。这是引发"钍反应堆爆炸后不消失""周围建筑不同步破坏"等严重不同步问题的根因（参考已删除的 `clientCompat.kts` v1 版本 bug）。
 - **正确的逐连接过滤模式**：要让部分客户端收不到包，应在广播级放行（不设置 `isCancelled`），让框架继续遍历连接；在逐连接级（`con != null`）检查 `clientType[player.uuid()]` 等条件，对不应接收的连接设置 `isCancelled = true`。这样其他连接仍能正常收到包。
 - **SendPacketEvent 是单例复用**：不要跨帧持有事件引用，监听器返回后字段会被下一次 `emit` 覆盖。
-- **ScriptAgent 原版不含 `clientCompat.kts`**：`d:\server\ScriptAgent4MindustryExt-3.4.0\scripts\wayzer\ext\` 仅有 6 个脚本（alert/autoUpdate/goServer/observer/profiler/welcomeMsg），`clientCompat.kts` 是后续添加的自定义脚本。新增此类拦截脚本前必须充分理解原版同步链路（`Call.buildDestroyed` → `BuildingComp.killed()` → `onDestroyed()` → 爆炸动画 + 残骸 + `tile.remove()`）。
+- **ScriptAgent 原版不含 `clientCompat.kts`**：上游发行版 ScriptAgent4MindustryExt-3.4.0 的 `scripts/wayzer/ext/`（本仓库不含其源码）仅有 6 个脚本（alert/autoUpdate/goServer/observer/profiler/welcomeMsg），`clientCompat.kts` 是后续添加的自定义脚本。新增此类拦截脚本前必须充分理解原版同步链路（`Call.buildDestroyed` → `BuildingComp.killed()` → `onDestroyed()` → 爆炸动画 + 残骸 + `tile.remove()`）。
 - **`BuildDestroyedCallPacket` 是原版包，不是 MindustryX 自定义包**：MindustryX 没有修改 `buildDestroyed`，也不会同时发送原版和自定义两个版本。原版客户端无法处理该包的真正原因是 MindustryX 新增 `@Remote` 方法导致包 ID 顺序偏移，使原版客户端按错误 ID 解析。
 - **`Call.buildDestroyed` 只有广播变体**：因 `@Remote` 默认 `variants = Variant.all`（`isOne=false`），未生成逐连接变体 `Call.buildDestroyed(con, build)`。无法通过 `Call.*` API 定向发送，必须依赖 SendPacketEvent 的两级机制过滤。
 - **`/sync` 命令绕过 SendPacketEvent**：`/sync` 走 `Call.worldDataBegin` + `sendWorldData` 全量重发世界数据，不经过 `BuildDestroyedCallPacket` 通道，因此即使 `clientCompat.kts` 取消了广播，`/sync` 仍能恢复同步状态——这也是定位此 bug 的关键线索之一。
@@ -390,7 +392,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 ### 死锁根因
 
-SA4 的 `ApplicationListener.exit()`（`ScriptAgent4MindustryExt-3.4.0/loader/mindustry/src/Main.kt:48-50`）在**主线程**上执行 `runBlocking { ScriptManager.disableAll() }`。若脚本协程在 `Dispatchers.game`（主线程）上 `delay()` 或处于 `withContext(Dispatchers.game)` 块内，取消恢复需要主线程调度，而主线程被 `runBlocking` 阻塞 → **死锁** → 脚本停止超时（3000ms）→ 服务器挂起。
+SA4 的 `ApplicationListener.exit()`（上游加载器 ScriptAgent4MindustryExt-3.4.0 的 `loader/mindustry/src/Main.kt:48-50`，源码不在本仓库）在**主线程**上执行 `runBlocking { ScriptManager.disableAll() }`。若脚本协程在 `Dispatchers.game`（主线程）上 `delay()` 或处于 `withContext(Dispatchers.game)` 块内，取消恢复需要主线程调度，而主线程被 `runBlocking` 阻塞 → **死锁** → 脚本停止超时（3000ms）→ 服务器挂起。
 
 ### exit 命令覆盖（不可删除）
 
@@ -405,7 +407,7 @@ SA4 的 `ApplicationListener.exit()`（`ScriptAgent4MindustryExt-3.4.0/loader/mi
 
 长循环协程（`while(true) { delay(); ... }` 或 `loop() { delay(); ... }`）**必须**使用 `Dispatchers.Default`（线程池），不得使用 `Dispatchers.game`（主线程）。仅在需要访问游戏数据时通过 `withContext(Dispatchers.game)` 切换到主线程。
 
-**正确模式**（参考 `coreMindustry/scoreboard.kts`、`wayzer/ext/antiCoreGrief.kts`）：
+**正确模式**（参考 `coreMindustry/scoreboard.kts`、`wayzer/ext/heartbeat.kts`）：
 ```kotlin
 loop(Dispatchers.Default) {
     delay(2000)
@@ -458,7 +460,7 @@ loop(Dispatchers.game) {  // ← 禁止！delay 在主线程，取消需主线�
     ↓
     ├─ System.out.println (终端)  → MyPrintStream → AttributedString.fromAnsi → 显示颜色
     ├─ logToFile (日志文件)       → 纯文本, 无颜色码 (与原版 Mindustry removeColors 一致)
-    └─ unifiedTextHolder          → WebUI 实时日志获取带颜色码文本 (ThreadLocal 传递)
+    └─ unifiedTextHolder          → 实时日志流获取带颜色码文本 (ThreadLocal 传递)
 ```
 
 ### 强制规范
@@ -477,7 +479,7 @@ loop(Dispatchers.game) {  // ← 禁止！delay 在主线程，取消需主线�
 
 6. **插件代码中 `PlaceHoldString` 用 Mindustry 颜色码**：`[green]`、`[yellow]`、`[red]`、`[light_gray]`、`[gold]`、`[scarlet]`、`[sky]`、`[#ff00ff]` 等。**禁止直接在 `Log.info` 调用中写 ANSI 码**——应通过 `ContentHelper.logToConsole` 或 `broadcast` 走标准链路。
 
-7. **日志文件为纯文本，无任何颜色码**：`log-0.txt` 通过 `stripAllColors` 剥离所有颜色码（arc `&xx`、ANSI、Mindustry `[name]`/`[#hex]`/`[]`），与原版 Mindustry 的 `removeColors` 行为一致。**WebUI 实时日志**通过 `unifiedTextHolder`（ThreadLocal）获取带颜色码文本渲染颜色；**WebUI 历史日志**从文件读取纯文本（无颜色）。`stripAllColors` 正则用 `[a-z_]*` 匹配 Mindustry 颜色名，排除 `[I]`/`[W]`/`[E]`/`[D]` 日志级别标记。
+7. **日志文件为纯文本，无任何颜色码**：`log-0.txt` 通过 `stripAllColors` 剥离所有颜色码（arc `&xx`、ANSI、Mindustry `[name]`/`[#hex]`/`[]`），与原版 Mindustry 的 `removeColors` 行为一致。**实时日志流**通过 `unifiedTextHolder`（ThreadLocal）获取带颜色码文本渲染颜色；**历史日志**从文件读取纯文本（无颜色）。`stripAllColors` 正则用 `[a-z_]*` 匹配 Mindustry 颜色名，排除 `[I]`/`[W]`/`[E]`/`[D]` 日志级别标记。
 
 ### `mindustryColorToArc` 实现规范（关键）
 
