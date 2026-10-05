@@ -180,7 +180,7 @@ fun getAnnouncementsJson(): JSONArray {
     return arr
 }
 
-// 供 WebUI 跨脚本调用, 返回 JSON 字符串避免 ClassLoader 不一致问题
+// 供管理面板等外部模块跨脚本调用, 返回 JSON 字符串避免 ClassLoader 不一致问题
 fun getAnnouncementsJsonString(): String = getAnnouncementsJson().toString()
 
 // ==================== 时间格式化 ====================
@@ -325,7 +325,7 @@ listen<EventType.PlayerJoin> {
     }
 }
 
-// 导出供 WebUI 调用
+// 导出供管理面板等外部模块调用
 export(::loadAnnouncements)
 export(::getAnnouncementList)
 export(::getAnnouncementsJson)

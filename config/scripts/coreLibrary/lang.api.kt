@@ -15,7 +15,7 @@ interface LangService {
     val mindustrySourceDir: String
     /** 重新加载 bundle.properties */
     fun loadBundles()
-    /** 获取 bundleData（key -> langCode -> translation），供 WebUI 等外部模块批量读取 */
+    /** 获取 bundleData（key -> langCode -> translation），供管理面板等外部模块批量读取 */
     fun getBundleMap(): MutableMap<String, MutableMap<String, String>>
     /** 按 lang 查 bundle 翻译，含 fallback：玩家语言 -> zh_CN -> null */
     fun translateBundle(key: String, lang: String): String?

@@ -12,7 +12,7 @@ object ContentHelper {
         // 直接传给 Log.info, 由 console.kts 的 Log.formatter 统一处理所有颜色码:
         // - mindustryColorToArc 覆盖所有 Mindustry 颜色 ([red], [sky], [light_yellow], [#hex], [] 重置, [[ 转义)
         // - 终端: &xx → ANSI 码显示颜色
-        // - 日志文件/WebUI: 保留原始颜色码, 前端解析渲染
+        // - 日志文件/前端: 保留原始颜色码, 由消费方解析渲染
         Log.info(text)
     }
 

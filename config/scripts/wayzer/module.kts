@@ -13,7 +13,7 @@ name = "WayZer Mindustry Plugin"
  * 功能:
  * (maps) better Maps,GameOver,ChangeMap | 更好的地图管理系统
  * (admin) independent Admin System | 独立的管理员系统
- * (playerInfo) extend variables for PlayerInfo | 扩展info相关变量
+ * extend variables for PlayerInfo | 扩展info相关变量
  * (permission) permission system | 权限系统
  * (voteProvider) provider for vote service | 投票服务实现
  * (user/profileBind) user token generate,check and user bind | 账号令牌生成,检测及用户绑定

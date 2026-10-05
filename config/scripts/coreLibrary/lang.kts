@@ -92,7 +92,7 @@ fun loadBundles() {
     }
 }
 
-/** 获取 bundleData（key -> langCode -> translation），供 WebUI 等外部模块批量读取 */
+/** 获取 bundleData（key -> langCode -> translation），供管理面板等外部模块批量读取 */
 fun getBundleMap(): MutableMap<String, MutableMap<String, String>> = bundleData
 
 fun loadGlobalProperties() {

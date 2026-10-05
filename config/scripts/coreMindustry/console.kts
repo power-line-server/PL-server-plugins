@@ -408,7 +408,7 @@ fun stripAllColors(text: String): String {
     return result.replace("\u0000", "[")
 }
 
-// 日志钩子: 外部模块(如 WebUI)可注册回调, 获取带 Mindustry 颜色码的格式化文本
+// 日志钩子: 外部模块(如管理面板)可注册回调, 获取带 Mindustry 颜色码的格式化文本
 // level: arc Log 级别, unifiedText: 经 mindustryColorToArc 统一后的文本(含 &xx 和残留的 [#hex] [name])
 typealias LogHook = (level: arc.util.Log.LogLevel, unifiedText: String) -> Unit
 val logHooks = mutableListOf<LogHook>()
@@ -462,8 +462,8 @@ onEnable {
             formatted = Strings.format(formatted, *arg)
         }
         val unified = mindustryColorToArc(formatted)
-        // 存入 ThreadLocal 供 Log.logger wrapper (WebUI) 读取带颜色码的文本
-        // WebUI 实时日志通过 unifiedTextHolder 获取颜色码, 历史日志从文件读取(纯文本)
+        // 存入 ThreadLocal 供外部日志消费者(如管理面板)读取带颜色码的文本
+        // 实时日志流通过 unifiedTextHolder 获取颜色码, 历史日志从文件读取(纯文本)
         unifiedTextHolder.set(formatted)
         if (useColors) {
             arcColorToAnsi(unified)

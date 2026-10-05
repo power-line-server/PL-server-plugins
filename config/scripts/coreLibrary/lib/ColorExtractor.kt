@@ -21,7 +21,7 @@ object ColorExtractor {
     /** Mindustry 源码目录路径（由 config 配置） */
     var sourceDir: String = ""
 
-    /** 终端 &xx 码 → WebUI 显示色值（arc 设计映射，非 ANSI 标准色） */
+    /** 终端 &xx 码 → 前端显示色值（arc 设计映射，非 ANSI 标准色） */
     private val termColors2Map = mapOf(
         "&k" to "#7f7f7f", "&w" to "#ffffff", "&r" to "#e55454", "&g" to "#38d667",
         "&y" to "#ffff00", "&b" to "#4169e1", "&m" to "#aa00ff", "&c" to "#00ffff",
@@ -31,18 +31,18 @@ object ColorExtractor {
         "&P" to "#ff80c0"
     )
 
-    /** 终端 &l 前缀亮色码 → WebUI 显示色值 */
+    /** 终端 &l 前缀亮色码 → 前端显示色值 */
     private val termColors3Map = mapOf(
         "&lc" to "#00ffff", "&lb" to "#87ceeb", "&ly" to "#ffd700", "&lr" to "#fa8072",
         "&lk" to "#bfbfbf", "&lw" to "#ffffff", "&lg" to "#38d667", "&lm" to "#ff80c0"
     )
 
-    /** 背景色码 → WebUI 显示色值 */
+    /** 背景色码 → 前端显示色值 */
     private val bgColorsMap = mapOf(
         "&br" to "#e55454", "&bg" to "#38d667", "&by" to "#ffff00", "&bb" to "#4169e1"
     )
 
-    /** ANSI 数字码 → WebUI 显示色值 */
+    /** ANSI 数字码 → 前端显示色值 */
     private val ansiColorsMap = mapOf(
         30 to "#7f7f7f", 31 to "#e55454", 32 to "#38d667", 33 to "#ffff00",
         34 to "#4169e1", 35 to "#aa00ff", 36 to "#00ffff", 37 to "#ffffff",
@@ -329,7 +329,7 @@ object ColorExtractor {
     // ============================================================
 
     /**
-     * 生成 WebUI 前端所需的完整颜色数据（Map 格式，供 webui.kts 转 JSON）。
+     * 生成前端所需的完整颜色数据（Map 格式，供管理面板转 JSON）。
      */
     fun generateFrontendColors(): Map<String, Any> {
         val colorMap = generateColorNameMap()

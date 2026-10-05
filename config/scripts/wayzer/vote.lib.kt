@@ -286,7 +286,7 @@ object VoteService {
     }
 }
 
-/** 强制观战事件: 在 /forceOB 和投票通过强制观战时触发,用于 playerInfo 统计观战次数 */
+/** 强制观战事件: 在 /forceOB 和投票通过强制观战时触发,用于统计脚本记录观战次数 */
 data class ForcedObEvent(val targetUuid: String) : Event {
     companion object : Event.Handler()
 }

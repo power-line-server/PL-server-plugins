@@ -14,18 +14,9 @@ name = "语言包键自动同步"
 val protectedKeyPrefixes = listOf("language.")
 
 // 动态 key 白名单（正则无法捕获的动态拼接 key，如 "{tr command.${name}.desc}"）
-// unitFactory.statusEditMenu 使用 "{tr ${field.labelKey}}" 动态引用倍率标签
 // trChat.trChatMenu 使用 "{tr $statusKey}" 动态引用启用状态
 // trChat.providerTypeMenu 使用 "{tr trChat.menu.providerType.${type.name.lowercase()}}" 动态引用Provider类型
-// music.kts 使用 "{tr ${sourceDisplayName(track.source)}}" 动态引用音乐来源显示名
 val manualKeys = mutableSetOf<String>(
-    "unitFactory.label.damage",
-    "unitFactory.label.health",
-    "unitFactory.label.speed",
-    "unitFactory.label.reload",
-    "unitFactory.label.build",
-    "unitFactory.label.drag",
-    "unitFactory.label.armor",
     "trChat.menu.main.enabled",
     "trChat.menu.main.disabled",
     "trChat.menu.providerType.openai",
@@ -34,30 +25,6 @@ val manualKeys = mutableSetOf<String>(
     "ipLimit.kick.message",
     "vip.expired",
     "moderator.expired",
-    "music.source.local",
-    "music.source.netease",
-    "music.source.kugou",
-    "music.source.ytdlp",
-    "music.source.online",
-    // devil.kts 动态拼接 "{tr devil.item.${key}.name/.desc}" 和 "{tr devil.item.bullet.${live/blank}}"
-    "devil.item.magnifier.name", "devil.item.magnifier.desc",
-    "devil.item.saw.name", "devil.item.saw.desc",
-    "devil.item.beer.name", "devil.item.beer.desc",
-    "devil.item.cigarette.name", "devil.item.cigarette.desc",
-    "devil.item.adrenaline.name", "devil.item.adrenaline.desc",
-    "devil.item.phone.name", "devil.item.phone.desc",
-    "devil.item.inverter.name", "devil.item.inverter.desc",
-    "devil.item.jammer.name", "devil.item.jammer.desc",
-    "devil.item.remote.name", "devil.item.remote.desc",
-    "devil.item.bullet.live", "devil.item.bullet.blank",
-    // webui 用户系统权限节点: users.html 通过 t(p.key, p.node) 动态引用 (17 个节点描述)
-    "webui.perm.status", "webui.perm.players", "webui.perm.bans", "webui.perm.ban",
-    "webui.perm.unban", "webui.perm.maps", "webui.perm.mapSwitch", "webui.perm.saves",
-    "webui.perm.saveLoad", "webui.perm.saveDelete", "webui.perm.console", "webui.perm.logs",
-    "webui.perm.announcements",
-    "webui.perm.announceSave", "webui.perm.announceNotify",
-    "webui.perm.snapshot",
-    "webui.perm.backgroundUpload", "webui.perm.logsChat", "webui.perm.logsCommand",
     // renderMap.kts 回复用 replyTr() 动态拼接 "{tr $key}"，静态正则无法捕获
     "renderMap.reply.start", "renderMap.reply.done", "renderMap.reply.fail", "renderMap.reply.error",
 )
@@ -75,7 +42,7 @@ fun scanLangKeys(): Set<String> {
         if (ext != "kts" && ext != "kt") return@forEach
         // 跳过 langSync 自身
         if (file.name == "langSync.kts") return@forEach
-        // 跳过 data/ 和 cache/ 目录（webui 前端资源由 scanWebuiKeys 单独扫描）
+        // 跳过 data/ 和 cache/ 目录（运行时数据与编译缓存）
         if (file.path.contains(File.separator + "data" + File.separator) ||
             file.path.contains(File.separator + "cache" + File.separator)
         ) return@forEach
@@ -90,51 +57,10 @@ fun scanLangKeys(): Set<String> {
             }
         }
     }
-    // 扫描 WebUI 前端资源中的 i18n 引用（data-i18n 属性、WebUI.t() 调用、i18n: 配置）
-    keys.addAll(scanWebuiKeys())
     keys.addAll(manualKeys)
     // 过滤掉不完整的 key（如动态拼接 trChat.menu.providerType.\${...} 提取的前缀）
     val filtered = keys.filter { !it.endsWith(".") }.toMutableSet()
     return filtered
-}
-
-// 扫描 data/webui/ 目录下 HTML/JS 文件中的 i18n key 引用
-fun scanWebuiKeys(): Set<String> {
-    val keys = mutableSetOf<String>()
-    val webuiDir = Config.dataDir.resolve("webui")
-    if (!webuiDir.exists()) return keys
-    // 覆盖前端全部实际写法: data-i18n / -placeholder / -title / -alt / -aria-label 属性,
-    // WebUI.t('key') 与 t('key')(单双引号均可), i18n: 'key', showConfirm('key', ...),
-    // 以及 ERROR_TRANSLATIONS 里 '后端消息': 'webui.xxx' 这类映射表值
-    // 注意: 漏掉任何一种引用写法, 对应 key 都会在下次同步被当作"未引用"整行删除,
-    //       新增前端引用形式时必须同步在这里补正则(或加入上方 manualKeys 白名单)
-    val webuiRegexes = listOf(
-        Regex("""data-i18n-placeholder="([\w.\-]+)"""),
-        Regex("""data-i18n-title="([\w.\-]+)"""),
-        Regex("""data-i18n-alt="([\w.\-]+)"""),
-        Regex("""data-i18n-aria-label="([\w.\-]+)"""),
-        Regex("""data-i18n="([\w.\-]+)"""),
-        Regex("""WebUI\.t\(['"]([\w.\-]+)['"]"""),
-        Regex("""\bt\(['"]([\w.\-]+)['"]"""),
-        Regex("""i18n:\s*['"]([\w.\-]+)['"]"""),
-        Regex("""showConfirm\('([\w.\-]+)'"""),
-        Regex("""'[^']*':\s*'(webui\.[\w.\-]+)'""")
-    )
-    webuiDir.walkTopDown().forEach { file ->
-        if (!file.isFile) return@forEach
-        val ext = file.extension.lowercase()
-        if (ext != "html" && ext != "js") return@forEach
-        runCatching {
-            file.readLines().forEach { line ->
-                webuiRegexes.forEach { regex ->
-                    regex.findAll(line).forEach { m ->
-                        keys.add(m.groupValues[1])
-                    }
-                }
-            }
-        }
-    }
-    return keys
 }
 
 // 同步单个 .properties 文件，保留注释和已有 key 顺序

@@ -144,7 +144,7 @@ suspend fun ban(player: PlayerData, time: Int, reason: String, operate: Player?,
             ip
         )
     }
-    // 实体组遍历/踢人/广播/玩家数据访问必须在游戏线程执行(调用方可能是 WebUI/反病毒等 IO 线程)
+    // 实体组遍历/踢人/广播/玩家数据访问必须在游戏线程执行(调用方可能是管理面板/后台服务等 IO 线程)
     withContext(Dispatchers.game) {
         Groups.player.filter { PlayerData[it].id in player.ids }.forEach {
             it.kick(ban)

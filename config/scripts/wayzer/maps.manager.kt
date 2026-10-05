@@ -160,7 +160,7 @@ object MapManager {
             Vars.netServer.sendWorldData(it)
         }
         players.forEach { it.add() }
-        // 所有玩家实体已恢复(Groups.player), 通知依赖方(如 pvpAnonymous 的换图匿名分配)
+        // 所有玩家实体已恢复(Groups.player), 通知依赖方(如匿名玩法的换图匿名分配)
         Events.fire(MapLoadCompleteEvent(info))
     }
 

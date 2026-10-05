@@ -45,7 +45,7 @@ interface PlayerBanStore : Remote {
     fun listAll(): List<PlayerBan>
 }
 
-// 封禁服务接口, ban.kts 实现, antiLogicVirus.kts 等脚本通过 Services.get<BanService>().get() 调用
+// 封禁服务接口, ban.kts 实现, 其他脚本通过 Services.get<BanService>().get() 调用
 interface BanService {
     suspend fun ban(player: PlayerData, time: Int, reason: String, operate: Player?, banIp: Boolean = false)
 }

@@ -8,7 +8,7 @@ import mindustry.gen.Player
 // realName: 玩家 uuid -> 原始名字(不含前缀后缀), 供 updateName 和其他脚本使用
 val realName = mutableMapOf<String, String>()
 
-// 匿名集合: uuid 在集合中的玩家显示纯匿名名(跳过 prefix/suffix 拼接), 由匿名脚本(pvpAnonymous)维护
+// 匿名集合: uuid 在集合中的玩家显示纯匿名名(跳过 prefix/suffix 拼接), 由匿名玩法脚本维护
 val anonymousUuids = mutableSetOf<String>()
 
 val TypeBinder<*>.tree: Map<String, Any> by reflectDelegate()
@@ -24,7 +24,7 @@ fun fixTruncatedName(name: String): String {
     return name
 }
 
-// 刷新玩家名字(聚合 prefix/suffix), 供 title.kts 等脚本调用
+// 刷新玩家名字(聚合前缀/后缀), 供头衔等脚本调用
 fun Player.updateName() {
     val raw = fixTruncatedName(realName[uuid()] ?: "NotInit")
     // 匿名时显示纯名字(不拼 prefix/suffix): 头衔、客户端标、uid 后缀全部隐藏

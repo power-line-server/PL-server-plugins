@@ -219,7 +219,7 @@ Core War 风格的物资体系：核心内所有物品按价值折算成统一�
 ### mapRule —— 地图权限组
 
 - `[@mapRule=组名]`：把该权限组挂到权限系统，并让它的权限排到其他 `@` 组之前。适合做"这张图只能用某些指令"的特殊图。
-- `[@permission=权限1;权限2;...]`：分号分隔的权限白名单，仅以下项生效：`-wayzer.vote.skipwave`、`-wayzer.ext.gather`（以 `-` 开头表示禁用白名单项，实现"这张图不让用某个技能/指令"）。
+- `[@permission=权限1;权限2;...]`：分号分隔的权限白名单，仅本开源包内存在的公开权限项生效（例如 `-wayzer.vote.skipwave`；以 `-` 开头表示禁用白名单项，实现"这张图不让用某个指令"）。
 
 ### TDDrop —— 打怪掉落
 
@@ -288,14 +288,6 @@ server 支持用**世界信息版（worldMessage）**放标记：方块配置文
 
 开源仓库包含微泽插件本体（`config/mods/ScriptAgent4MindustryExt-3.4.0.jar`，版权延续上游，见 [LICENSE](LICENSE)），以及在其之上开发的**已开源**插件脚本；`server.jar`（Mindustry 160.5 + MindustryX 2026.10.02.B502）不在仓库内，由一键安装脚本从官方渠道下载。
 
-**本开源包不包含以下闭源部分**（它们只存在于作者的开发仓库与主服）：
-
-- WebUI 网页管理后台（及配套前端、HTTPS 证书脚本、API 密钥系统）
-- 技能系统（`skills` / `skillsAdvanced` / `skillSwitch`）
-- 单位工厂（`unitFactory`）
-- 音乐系统（`music`）
-- 后缀/头衔（`suffix` / `title`）
-- 玩家信息数据层（`playerInfo`）、集合传送（`gatherTp`）、每日一言（`dailyQuote`）、服务器简介（`introduce`）
-- 防炸核心（`antiCoreGrief`）、反逻辑病毒（`antiLogicVirus`）、匿名 PVP（`pvpAnonymous`）
+**本开源包为删减版**：仅包含上文《目录结构》与《config/scripts 各模块》中列出的公开模块。部分高级功能与配套模块（管理面板、扩展玩法、统计与运营相关等）未包含在本仓库，相关实现仅存在于作者的开发仓库与主服。
 
 因此开源包启动后的脚本数量与功能会少于主服；脚本缺失导致的报错已在开源侧清理（见本仓库提交记录）。

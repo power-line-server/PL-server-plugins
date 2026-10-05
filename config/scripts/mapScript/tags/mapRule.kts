@@ -3,10 +3,7 @@ package mapScript.tags
 import coreLibrary.lib.event.RequestPermissionEvent
 
 val group by mapTag("@mapRule")
-fun whiteList(it: String) =
-    it.startsWith("-wayzer.user.skills.")
-            || it == "-wayzer.vote.skipwave"
-            || it == "-wayzer.ext.gather"
+fun whiteList(it: String) = it == "-wayzer.vote.skipwave"
 
 @Savable(false)
 var permissions: List<String> = emptyList()

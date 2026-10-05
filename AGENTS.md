@@ -3,7 +3,7 @@
 本文件用于规范代理在 Mindustry 服务器插件开发中的核心原则、懒惰开发者法则与具体工作流，所有修改应以简体中文为首要表达。
 
 > **当前基线**：**Mindustry 160.5 + MindustryX 2026.10.02.B502**（server.jar）、**JDK 27**、ScriptAgent4MindustryExt 3.4.0。
-> **本开源包不含**（只存在于作者的开发仓库与主服）：WebUI 网页管理后台、技能系统、单位工厂、音乐系统、后缀与头衔、玩家信息数据层（playerInfo）、集合传送（gatherTp）、每日一言（dailyQuote）、服务器简介（introduce）、防炸核心（antiCoreGrief）、反逻辑病毒（antiLogicVirus）、匿名 PVP（pvpAnonymous）。涉及这些功能的历史说明仅作参考。
+> **本开源包为删减版**：仅包含本仓库实际存在的公开模块；部分高级功能与配套模块（管理面板、扩展玩法、统计与运营相关等）未包含在本仓库，相关实现仅存在于作者的开发仓库与主服。涉及这些功能的历史说明仅作参考。
 
 ## 核心原则
 
@@ -100,7 +100,7 @@
 
 - 用 python 修改存档 meta 的 `description` 注入 `[@标签]`（如 `[@autoExchange]`），再通过换图/回档触发脚本 Enable/Disable，从日志验证生命周期
 - 存档格式：`MSAV`(4B) + version(4B) + 各 chunk（meta/patches/content/map/entities/markers/custom，每 chunk 为 `>i` 长度 + 数据），整体 zlib 压缩
-- **回档/换图**：本开源包不含 WebUI；可用终端命令（如 `host <地图ID>`）或玩家命令换图，从而触发地图脚本的 Enable/Disable
+- **回档/换图**：本开源包不含网页管理面板；可用终端命令（如 `host <地图ID>`）或玩家命令换图，从而触发地图脚本的 Enable/Disable
 - **命令域提醒**：控制台/HTTP 接口走的 `Commands.Root` 域只含原版控制台命令，自定义脚本命令（如 `anon`）不在其中；验证自定义命令需走真实终端或玩家命令链
 
 ## 配置文件规范
@@ -173,7 +173,7 @@ ConfigApi 读取顺序：`config.conf`（用户值优先）→ `systemProperties
 
 3. **保留占位符**：翻译中保留 `{var}` 形式的占位符，例如 `lang.reply.langSet=[green]你的语言已设为 {v}\n[yellow]可用语言: {available}`
 
-4. **颜色码**：翻译中可使用 Mindustry 颜色码（`[green]`、`[yellow]`、`[red]`、`[light_gray]`、`[gold]`、`[scarlet]`、`[sky]`、`[#ff00ff]` 等）。玩家收到时由 `mindustryColorHandler` 保留原码透传给客户端；控制台收到时由 `ContentHelper.logToConsole` 直接 `Log.info(text)` 保留原码，再经 `Log.formatter` 的 `mindustryColorToArc` 统一转 ANSI（终端显示）或保留原码（日志文件供 WebUI 渲染）。详见"终端颜色与日志规范"。
+4. **颜色码**：翻译中可使用 Mindustry 颜色码（`[green]`、`[yellow]`、`[red]`、`[light_gray]`、`[gold]`、`[scarlet]`、`[sky]`、`[#ff00ff]` 等）。玩家收到时由 `mindustryColorHandler` 保留原码透传给客户端；控制台收到时由 `ContentHelper.logToConsole` 直接 `Log.info(text)` 保留原码，再经 `Log.formatter` 的 `mindustryColorToArc` 统一转 ANSI（终端显示）或保留原码（日志文件供前端渲染）。详见"终端颜色与日志规范"。
 
 5. **多行值必须用 `\n` 转义单行，禁止物理换行**：properties 中 `key=值` 到行尾即结束，物理换行的后续裸行会被 Java Properties 加载时**静默忽略**（续行需要行尾反斜杠 `\`，不是裸换行）。多行文本（菜单 msg、公告等）必须写成单行 `key=第一行\n第二行`（`\n` 为转义序列，加载时变真实换行）。**典型症状：菜单标题/说明只显示第一行，其余内容整段消失**（如"当前状态："后空白）。对照正确范例：`saveMgr.menu.main.msg=[green]请选择操作类型：\n[yellow]=======================`
 
