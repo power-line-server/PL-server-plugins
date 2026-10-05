@@ -13,7 +13,6 @@ config/logs/
 config/assetCache/
 config/scripts/cache/
 config/scripts/metadata/
-config/scripts/data/webui/keystore.p12
 config/scripts/data/restart.flag
 config/scripts/data/heartbeat.txt
 config/scripts/data/h2DB*.mv.db
